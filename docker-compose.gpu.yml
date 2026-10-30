@@ -1,0 +1,11 @@
+# ใช้เฉพาะเครื่องที่มี NVIDIA GPU และเปิดใช้ GPU ใน Docker แล้ว
+# รัน: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

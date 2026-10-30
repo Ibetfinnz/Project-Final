@@ -1,0 +1,18 @@
+{
+  "name": "ocr-service",
+  "version": "1.0.0",
+  "description": "Typhoon OCR service (local, via Ollama) for the n8n workflows",
+  "main": "ocr-server.js",
+  "scripts": {
+    "start": "node ocr-server.js",
+    "test": "node --test *.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1",
+    "multer": "^2.2.0"
+  }
+}

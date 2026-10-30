@@ -1,0 +1,12 @@
+# ตัวอย่างไฟล์ .wslconfig สำหรับ Windows + Docker Desktop (WSL2 backend)
+# คัดลอกไปไว้ที่ C:\Users\<ชื่อผู้ใช้>\.wslconfig แล้วรีสตาร์ท Docker Desktop
+#
+# เหตุผล: Ollama ใน Docker ต้องโหลดโมเดล OCR 3B (~2.8GB) และโมเดลสกัด JSON 8B (~6.3GB)
+# ค่าเริ่มต้นของ WSL (50% ของ RAM) บนเครื่อง 16GB ได้เพียง ~7.7GB -> WSL ถูก kill
+# อาการที่เห็น: Docker Engine หลุด / n8n ขึ้น "possible out-of-memory issue"
+
+[wsl2]
+memory=10GB
+swap=4GB
+autoMemoryReclaim=gradual
+sparseVhd=true

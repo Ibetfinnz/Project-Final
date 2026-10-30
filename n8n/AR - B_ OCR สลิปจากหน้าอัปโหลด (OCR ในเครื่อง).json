@@ -1,0 +1,279 @@
+{
+  "name": "AR - B: OCR สลิปจากหน้าอัปโหลด (OCR ในเครื่อง)",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// เตรียมไฟล์ส่งเข้า Typhoon OCR ในเครื่อง (ไม่ต้องสร้าง request ของ Claude แล้ว)\nconst out = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  if (!item.binary || !item.binary.data) {\n    out.push({ json: { ...item.json, skip: true, error: 'ไม่พบไฟล์แนบ' } });\n    continue;\n  }\n  out.push({\n    json: { ...item.json, upload_id: $('Webhook').first().json.body.upload_id },\n    binary: { data: item.binary.data },\n  });\n}\nreturn out;"
+      },
+      "id": "e7488db4-5e70-4bad-9568-80f90a7cfe18",
+      "name": "Build OCR request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        -432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ocr:3001/typhoon-ocr",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "b0bd3089-0f88-40ba-b8cb-bf9d7c4fbe67",
+      "name": "Typhoon OCR (local)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        576,
+        -432
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const PROMPT = `คุณคือระบบสกัดข้อมูลจากข้อความ OCR ของเอกสารการเงินภาษาไทย/อังกฤษ\nประเภทเอกสาร (doc_type): SLIP=สลิปโอนเงินธนาคาร, OP=ใบสั่งซื้อ, INV=ใบแจ้งหนี้, BN=ใบวางบิล, RC=ใบเสร็จรับเงิน, TX=ใบกำกับภาษี\nตอบเป็น JSON เท่านั้น ห้ามมีคำอธิบายหรือ markdown ตามโครงสร้างนี้ ช่องที่ไม่เกี่ยวกับประเภทเอกสารให้ใส่ null หรือ []:\n{\"doc_type\":string,\"doc_no\":string|null,\"ref_no\":string|null,\"customer_po_no\":string|null,\"customer_name\":string|null,\"tax_id\":string|null,\"address\":string|null,\"email\":string|null,\"issue_date\":\"YYYY-MM-DD\"|null,\"due_date\":\"YYYY-MM-DD\"|null,\"items\":[{\"description\":string,\"qty\":number,\"unit_price\":number}],\"subtotal\":number|null,\"vat\":number|null,\"total\":number|null,\"invoice_refs\":[{\"doc_no\":string,\"amount\":number}],\"transfer_datetime\":\"YYYY-MM-DDTHH:mm:ss\"|null,\"amount\":number|null,\"sender_name\":string|null,\"receiver_name\":string|null,\"bank\":string|null,\"memo\":string|null,\"confidence\":number}\nกติกา:\n- ห้ามแปลภาษา คัดลอกข้อความตามต้นฉบับ ถ้าอ่านไม่ออกให้ใส่ null ห้ามเดา\n- ปี พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543) ตัวเลขห้ามมีเครื่องหมายจุลภาค\n- doc_no คือเลขที่ของเอกสารใบนั้นเอง\n- ref_no คือเลขเอกสารก่อนหน้าที่อ้างถึง (ใบแจ้งหนี้อ้างใบสั่งซื้อ, ใบเสร็จอ้างใบแจ้งหนี้) แต่ถ้าเป็นสลิปให้ใส่รหัสอ้างอิงของธนาคาร\n- customer_name คือลูกค้า/ผู้ซื้อ ไม่ใช่ผู้ออกเอกสารและไม่ใช่ผู้ลงนาม\n- ใบวางบิล (BN): ใส่แต่ละแถวใน invoice_refs (doc_no = เลขที่ใบแจ้งหนี้, amount = จำนวนเงิน) และ items เป็น []\n- สลิป (SLIP): ใช้ amount, sender_name, receiver_name, bank, transfer_datetime, memo (บันทึกช่วยจำที่ผู้โอนพิมพ์) และ items เป็น []\n- confidence คือความมั่นใจรวม 0-1`;\nconst out = [];\nfor (const it of $input.all()) {\n  const r = it.json;\n  const text = r.success && r.text ? r.text : '';\n  const ocrError = text ? null : (r.error?.message || (r.error ? JSON.stringify(r.error) : 'OCR ไม่ได้ข้อความ'));\n  out.push({ json: {\n    ocr_error: ocrError,\n    ocr_text: text,\n    extract_request: {\n      model: 'scb10x/llama3.1-typhoon2-8b-instruct:latest',\n      stream: false, format: 'json',\n      options: { temperature: 0, num_ctx: 8192 },\n      messages: [\n        { role: 'system', content: PROMPT },\n        { role: 'user', content: 'ข้อความ OCR ของเอกสาร:\\n\\n' + (text || '(ไม่มีข้อความ)') },\n      ],\n    },\n  } });\n}\nreturn out;"
+      },
+      "id": "27965c0f-f440-46be-91d6-6fa5822d8374",
+      "name": "Build extract request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.extract_request }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "760e67ab-6695-4d23-a005-a26b91a95527",
+      "name": "Ollama extract JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        -432
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.file_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "0c35ca1a-ae1c-4fb0-9002-ec7cb8c46b49",
+      "name": "Download file1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        -432
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "JsLeWhF91fPWjCA2",
+          "name": "AR Backend Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ar-upload",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "b304ae73-dfe5-4071-b9f4-00c98423f5a9",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -432
+      ],
+      "webhookId": "b8939eda-67ba-4c56-b33d-3f03143db795",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FG3n32kc99nXCK1N",
+          "name": "AR Webhook Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parseJson = (t) => {\n  const s = String(t || '').replace(/```json|```/g, '').trim();\n  const a = s.indexOf('{'), b = s.lastIndexOf('}');\n  return JSON.parse(s.slice(a, b + 1));\n};\nconst src = { ...$('Build OCR request').first().json, upload_id: $('Webhook').first().json.body.upload_id };\nconst ext = $('Build extract request').first().json;\nconst r = $input.first().json;\nconst fail = (msg) => [{ json: { upload_id: src.upload_id, error: msg } }];\nif (src.skip) return fail(src.error);\nif (ext.ocr_error) return fail('OCR ล้มเหลว: ' + ext.ocr_error);\nif (r.error || !r.message?.content) return fail('สกัดข้อมูลจาก OCR ไม่สำเร็จ: ' + (r.error?.message || JSON.stringify(r.error || '')));\ntry {\n  return [{ json: { upload_id: src.upload_id, ocr: parseJson(r.message.content), ocr_text: ext.ocr_text } }];\n} catch (e) {\n  return fail('อ่านผลลัพธ์ OCR ไม่ได้: ' + e.message);\n}"
+      },
+      "id": "d4029635-48be-46a7-b577-8ecf3c47d708",
+      "name": "Parse result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        -432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:4000/api/internal/uploads/ocr-result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "d2527925-b36a-4b3c-acc6-35d47da434b5",
+      "name": "Send OCR result to backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        -432
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "JsLeWhF91fPWjCA2",
+          "name": "AR Backend Key"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Build OCR request": {
+      "main": [
+        [
+          {
+            "node": "Typhoon OCR (local)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typhoon OCR (local)": {
+      "main": [
+        [
+          {
+            "node": "Build extract request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build extract request": {
+      "main": [
+        [
+          {
+            "node": "Ollama extract JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama extract JSON": {
+      "main": [
+        [
+          {
+            "node": "Parse result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file1": {
+      "main": [
+        [
+          {
+            "node": "Build OCR request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Download file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse result": {
+      "main": [
+        [
+          {
+            "node": "Send OCR result to backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "uBRr5qOHyCvdh0hT"
+  },
+  "versionId": "a9b08869-f6a7-4913-9fb3-9158685b0dd9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a7b38bdffe69f8c5d9c175a0252c8c65e5728375ae466c29382d53dd4e7ca575"
+  },
+  "nodeGroups": [],
+  "id": "75dwktZjtPMgFGVN",
+  "tags": []
+}

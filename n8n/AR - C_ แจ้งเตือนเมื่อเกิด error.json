@@ -1,0 +1,101 @@
+[
+  {
+    "updatedAt": "2026-10-05T13:51:26.166Z",
+    "createdAt": "2026-10-05T13:49:33.006Z",
+    "id": "uBRr5qOHyCvdh0hT",
+    "name": "AR - C",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "c50d62c6-fb0d-49dc-bf30-8514c37138c8",
+        "name": "Error Trigger",
+        "type": "n8n-nodes-base.errorTrigger",
+        "typeVersion": 1,
+        "position": [
+          192,
+          32
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "66070272@kmitl.ac.th",
+          "toEmail": "ibetfinnz2@gmail.com",
+          "subject": "=n8n ล้มเหลว: {{ $json.workflow.name }}",
+          "emailFormat": "text",
+          "text": "={{ $json.execution.error.message }}\n{{ $json.execution.url }}",
+          "options": {}
+        },
+        "id": "1b9d33a5-0a5b-4a6c-9e57-142f4561a86f",
+        "name": "Email on error",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [
+          432,
+          32
+        ],
+        "webhookId": "51763329-edb5-47b7-bc8e-2b9a6aeb752d",
+        "credentials": {
+          "smtp": {
+            "id": "WiCgSZ6JJv30eK9n",
+            "name": "SMTP account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Error Trigger": {
+        "main": [
+          [
+            {
+              "node": "Email on error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "a24a43ac-32fb-4759-8923-f0d7ddc0ab9a",
+    "activeVersionId": "a24a43ac-32fb-4759-8923-f0d7ddc0ab9a",
+    "versionCounter": 1,
+    "triggerCount": 0,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-10-05T13:49:33.009Z",
+        "createdAt": "2026-10-05T13:49:33.009Z",
+        "role": "workflow:owner",
+        "workflowId": "uBRr5qOHyCvdh0hT",
+        "projectId": "2IMmbrU6cQX9zHMl",
+        "project": {
+          "updatedAt": "2026-10-05T12:35:35.907Z",
+          "createdAt": "2026-10-05T12:35:18.986Z",
+          "id": "2IMmbrU6cQX9zHMl",
+          "name": "123 66070272@kmitl.ac.th <66070272@kmitl.ac.th>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "8c29db50-8870-4f1b-9af3-208dc1d3c93c"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version a24a43ac",
+      "description": ""
+    }
+  }
+]

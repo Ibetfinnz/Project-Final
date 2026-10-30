@@ -1,0 +1,85 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+      TZ: Asia/Bangkok
+      PGTZ: Asia/Bangkok
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on: [db]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
+      UPLOAD_DIR: /data/uploads
+      INTERNAL_BASE_URL: http://backend:4000
+      TZ: Asia/Bangkok
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "4000:4000"
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    depends_on: [ocr, ollama]
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: ${N8N_HOST}
+      WEBHOOK_URL: ${N8N_PUBLIC_URL}
+      GENERIC_TIMEZONE: Asia/Bangkok
+      TZ: Asia/Bangkok
+      N8N_PAYLOAD_SIZE_MAX: 64
+    volumes:
+      - n8ndata:/home/node/.n8n
+    ports:
+      - "5678:5678"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "3000:80"
+
+  # ---------- OCR ในเครื่อง (ใหม่) ----------
+  # n8n เรียกผ่านชื่อบริการ http://ocr:3001 ภายใน network ของ compose
+  ocr:
+    build: ./ocr-service
+    restart: unless-stopped
+    depends_on: [ollama]
+    environment:
+      PORT: 3001
+      OLLAMA_URL: http://ollama:11434
+      TYPHOON_OCR_MODEL: scb10x/typhoon-ocr1.5-3b:latest
+      MAX_FILE_SIZE_MB: 20
+      TZ: Asia/Bangkok
+    ports:
+      - "127.0.0.1:3001:3001" # ไว้ทดสอบ /health จากเครื่องตัวเองเท่านั้น
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 10m # เก็บโมเดลไว้ในหน่วยความจำ ลดเวลาโหลดซ้ำ
+      # โหลดได้ทีละโมเดลเท่านั้น (OCR 3B กับ extract 8B ใช้ RAM รวมกันเกินเครื่อง)
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollamadata:/root/.ollama
+    ports:
+      - "127.0.0.1:11435:11434" # ไว้ทดสอบจากเครื่องตัวเองเท่านั้น
+
+volumes:
+  pgdata:
+  uploads:
+  n8ndata:
+  ollamadata:

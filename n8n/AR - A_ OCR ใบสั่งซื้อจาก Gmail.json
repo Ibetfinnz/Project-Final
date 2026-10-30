@@ -1,0 +1,411 @@
+[
+  {
+    "updatedAt": "2026-10-16T12:01:38.865Z",
+    "createdAt": "2026-10-05T12:36:07.837Z",
+    "id": "A2fOGEfvIpItkPv7",
+    "name": "AR - A: ใบสั่งซื้อจาก Gmail (OCR ในเครื่อง)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://ocr:3001/typhoon-ocr",
+          "sendBody": true,
+          "contentType": "multipart-form-data",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "parameterType": "formBinaryData",
+                "name": "file",
+                "inputDataFieldName": "data"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 600000
+          }
+        },
+        "id": "7606ff03-0035-4124-bab1-98d478e80505",
+        "name": "Typhoon OCR (local)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -1376,
+          -528
+        ],
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 5000,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const PROMPT = `คุณคือระบบสกัดข้อมูลจากข้อความ OCR ของเอกสารการเงินภาษาไทย/อังกฤษ\nประเภทเอกสาร (doc_type): SLIP=สลิปโอนเงินธนาคาร, OP=ใบสั่งซื้อ, INV=ใบแจ้งหนี้, BN=ใบวางบิล, RC=ใบเสร็จรับเงิน, TX=ใบกำกับภาษี\nตอบเป็น JSON เท่านั้น ห้ามมีคำอธิบายหรือ markdown ตามโครงสร้างนี้ ช่องที่ไม่เกี่ยวกับประเภทเอกสารให้ใส่ null หรือ []:\n{\"doc_type\":string,\"doc_no\":string|null,\"ref_no\":string|null,\"customer_po_no\":string|null,\"customer_name\":string|null,\"tax_id\":string|null,\"address\":string|null,\"email\":string|null,\"issue_date\":\"YYYY-MM-DD\"|null,\"due_date\":\"YYYY-MM-DD\"|null,\"items\":[{\"description\":string,\"qty\":number,\"unit_price\":number}],\"subtotal\":number|null,\"vat\":number|null,\"total\":number|null,\"invoice_refs\":[{\"doc_no\":string,\"amount\":number}],\"transfer_datetime\":\"YYYY-MM-DDTHH:mm:ss\"|null,\"amount\":number|null,\"sender_name\":string|null,\"receiver_name\":string|null,\"bank\":string|null,\"memo\":string|null,\"confidence\":number}\nกติกา:\n- ห้ามแปลภาษา คัดลอกข้อความตามต้นฉบับ ถ้าอ่านไม่ออกให้ใส่ null ห้ามเดา\n- ปี พ.ศ. ให้แปลงเป็น ค.ศ. (ลบ 543) ตัวเลขห้ามมีเครื่องหมายจุลภาค\n- doc_no คือเลขที่ของเอกสารใบนั้นเอง\n- ref_no คือเลขเอกสารก่อนหน้าที่อ้างถึง (ใบแจ้งหนี้อ้างใบสั่งซื้อ, ใบเสร็จอ้างใบแจ้งหนี้) แต่ถ้าเป็นสลิปให้ใส่รหัสอ้างอิงของธนาคาร\n- customer_name คือลูกค้า/ผู้ซื้อ ไม่ใช่ผู้ออกเอกสารและไม่ใช่ผู้ลงนาม\n- ใบวางบิล (BN): ใส่แต่ละแถวใน invoice_refs (doc_no = เลขที่ใบแจ้งหนี้, amount = จำนวนเงิน) และ items เป็น []\n- สลิป (SLIP): ใช้ amount, sender_name, receiver_name, bank, transfer_datetime, memo (บันทึกช่วยจำที่ผู้โอนพิมพ์) และ items เป็น []\n- confidence คือความมั่นใจรวม 0-1`;\nconst out = [];\nfor (const it of $input.all()) {\n  const r = it.json;\n  const text = r.success && r.text ? r.text : '';\n  const ocrError = text ? null : (r.error?.message || (r.error ? JSON.stringify(r.error) : 'OCR ไม่ได้ข้อความ'));\n  out.push({ json: {\n    ocr_error: ocrError,\n    ocr_text: text,\n    extract_request: {\n      model: 'scb10x/llama3.1-typhoon2-8b-instruct:latest',\n      stream: false, format: 'json',\n      options: { temperature: 0, num_ctx: 8192 },\n      messages: [\n        { role: 'system', content: PROMPT },\n        { role: 'user', content: 'ข้อความ OCR ของเอกสาร:\\n\\n' + (text || '(ไม่มีข้อความ)') },\n      ],\n    },\n  } });\n}\nreturn out;"
+        },
+        "id": "3e364d14-f457-4dae-a726-aa63f013d4db",
+        "name": "Build extract request",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1136,
+          -528
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://ollama:11434/api/chat",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json.extract_request }}",
+          "options": {
+            "timeout": 600000
+          }
+        },
+        "id": "8b8cae51-a3ab-4188-ae7f-7597e9273111",
+        "name": "Ollama extract JSON",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -896,
+          -528
+        ],
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 5000,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "simple": false,
+          "filters": {
+            "q": "has:attachment is:unread (ใบสั่งซื้อ OR ใบแจ้งหนี้ OR ใบวางบิล OR ใบเสร็จ OR ใบกำกับภาษี OR สลิป OR slip OR PO OR invoice OR receipt)"
+          },
+          "options": {
+            "downloadAttachments": true
+          }
+        },
+        "id": "21dfec18-6f29-452f-9fdc-dba22eb46791",
+        "name": "Gmail Trigger",
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -2096,
+          -528
+        ],
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "lXCu96a7nV8mt7zD",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// แตกไฟล์แนบ 1 ไฟล์ = 1 item (เฉพาะ PDF/PNG/JPG)\nconst out = [];\nfor (const item of $input.all()) {\n  const bins = item.binary || {};\n  Object.keys(bins).forEach((key, i) => {\n    const b = bins[key];\n    if (!/pdf|image\\/(png|jpe?g)/i.test(b.mimeType || '')) return;\n    out.push({\n      json: {\n        message_id: item.json.id,\n        email_from: item.json.from?.value?.[0]?.address || null,\n        subject: item.json.subject || '',\n        idx: i,\n        file_name: b.fileName || ('attachment_' + i),\n      },\n      binary: { data: b },\n    });\n  });\n}\nreturn out;"
+        },
+        "id": "0f9da1d8-73a0-4eca-9a01-9e57c3641adf",
+        "name": "Split attachments",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1856,
+          -528
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// เตรียมไฟล์ส่งเข้า Typhoon OCR ในเครื่อง (ไม่ต้องสร้าง request ของ Claude แล้ว)\nconst out = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  if (!item.binary || !item.binary.data) {\n    out.push({ json: { ...item.json, skip: true, error: 'ไม่พบไฟล์แนบ' } });\n    continue;\n  }\n  const buf = await this.helpers.getBinaryDataBuffer(i, 'data');\n  out.push({\n    json: { ...item.json, file_base64: buf.toString('base64') },\n    binary: { data: item.binary.data },\n  });\n}\nreturn out;"
+        },
+        "id": "06b1bc1c-0a10-4a63-8638-3656fb9687cd",
+        "name": "Build OCR request",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1616,
+          -528
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://backend:4000/api/internal/documents/ingest",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $json }}",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "3b6d5bbd-b6b9-4303-8678-84443394c590",
+        "name": "Send to backend",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          -416,
+          -528
+        ],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "JsLeWhF91fPWjCA2",
+            "name": "AR Backend Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "markAsRead",
+          "messageId": "={{ $('Split attachments').first().json.message_id }}"
+        },
+        "id": "36727484-44ae-446a-8986-4477e44208d5",
+        "name": "Mark as read",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          -176,
+          -528
+        ],
+        "webhookId": "d4852672-6ff8-44ae-980e-deef149b7cdc",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "lXCu96a7nV8mt7zD",
+            "name": "Gmail account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "=={{ $('Send to backend').item.json.needs_review }}",
+                "value2": "yes"
+              }
+            ]
+          }
+        },
+        "id": "d923865d-9fa5-4271-b2bf-490b4f9954de",
+        "name": "Need review?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          64,
+          -528
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "n8n@yourcompany.com",
+          "toEmail": "ar@yourcompany.com",
+          "subject": "=={{ $('Send to backend').item.json.label }} {{ $('Send to backend').item.json.doc_no || '' }} ต้องตรวจสอบ",
+          "emailFormat": "text",
+          "text": "={{ ($('Send to backend').item.json.errors || []).join('\\n') }}\n\nเปิดดูที่ระบบรายรับ > รายการเอกสาร",
+          "options": {}
+        },
+        "id": "1360f726-f9f8-444d-91aa-f71ec0b8835a",
+        "name": "Email AR team",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2.1,
+        "position": [
+          304,
+          -608
+        ],
+        "webhookId": "eef8016d-9206-455e-8aea-950cec9a1cb6",
+        "credentials": {
+          "smtp": {
+            "id": "WiCgSZ6JJv30eK9n",
+            "name": "SMTP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const parseJson = (t) => {\n  const s = String(t || '').replace(/```json|```/g, '').trim();\n  const a = s.indexOf('{'), b = s.lastIndexOf('}');\n  return JSON.parse(s.slice(a, b + 1));\n};\nconst src = $('Build OCR request').all();\nconst ext = $('Build extract request').all();\nconst out = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const s = src[i].json;\n  const errors = [];\n  let ocr = {};\n  if (ext[i]?.json?.ocr_error) errors.push('OCR ล้มเหลว: ' + ext[i].json.ocr_error);\n  try { ocr = parseJson(items[i].json.message?.content); }\n  catch (e) { errors.push('อ่านผลลัพธ์ OCR ไม่ได้: ' + e.message); }\n  out.push({ json: {\n    source: 'gmail',\n    source_ref: `${s.message_id}:${s.idx}`,\n    email_from: s.email_from,\n    file_name: s.file_name,\n    file_base64: s.file_base64,\n    ocr,\n    ocr_text: ext[i]?.json?.ocr_text || '',\n    confidence: ocr.confidence ?? null,\n    validation: { ok: errors.length === 0, errors },\n  } });\n}\nreturn out;"
+        },
+        "id": "1c999c71-bee2-4e4c-a9f0-811d30eac67d",
+        "name": "Parse and validate",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -656,
+          -528
+        ]
+      }
+    ],
+    "connections": {
+      "Typhoon OCR (local)": {
+        "main": [
+          [
+            {
+              "node": "Build extract request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build extract request": {
+        "main": [
+          [
+            {
+              "node": "Ollama extract JSON",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ollama extract JSON": {
+        "main": [
+          [
+            {
+              "node": "Parse and validate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gmail Trigger": {
+        "main": [
+          [
+            {
+              "node": "Split attachments",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split attachments": {
+        "main": [
+          [
+            {
+              "node": "Build OCR request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build OCR request": {
+        "main": [
+          [
+            {
+              "node": "Typhoon OCR (local)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send to backend": {
+        "main": [
+          [
+            {
+              "node": "Mark as read",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Mark as read": {
+        "main": [
+          [
+            {
+              "node": "Need review?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Need review?": {
+        "main": [
+          [
+            {
+              "node": "Email AR team",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse and validate": {
+        "main": [
+          [
+            {
+              "node": "Send to backend",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false,
+      "timeSavedMode": "fixed",
+      "errorWorkflow": "uBRr5qOHyCvdh0hT",
+      "callerPolicy": "workflowsFromSameOwner"
+    },
+    "staticData": {
+      "node:Gmail Trigger": {
+        "Gmail Trigger": {
+          "lastTimeChecked": 1791208372
+        }
+      }
+    },
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "09150741-b523-43e3-88b9-e7692fc184ed",
+    "activeVersionId": "816c9069-e4e0-4066-86e0-9114ceb46ca4",
+    "versionCounter": 70,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-10-05T12:36:07.840Z",
+        "createdAt": "2026-10-05T12:36:07.840Z",
+        "role": "workflow:owner",
+        "workflowId": "A2fOGEfvIpItkPv7",
+        "projectId": "2IMmbrU6cQX9zHMl",
+        "project": {
+          "updatedAt": "2026-10-05T12:35:35.907Z",
+          "createdAt": "2026-10-05T12:35:18.986Z",
+          "id": "2IMmbrU6cQX9zHMl",
+          "name": "123 66070272@kmitl.ac.th <66070272@kmitl.ac.th>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "8c29db50-8870-4f1b-9af3-208dc1d3c93c"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]
