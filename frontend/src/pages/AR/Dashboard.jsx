@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { api } from '../api.js';
-import { baht, dateTh, num } from '../format.js';
-import { Card, PageHeader, StatusBadge } from '../components.jsx';
+import { api } from '../../api.js';
+import { baht, dateTh, num } from '../../format.js';
+import { Card, PageHeader, StatusBadge } from '../../components.jsx';
 
 export default function Dashboard() {
   const [sum, setSum] = useState(null);

@@ -7,6 +7,15 @@ export const INITIAL_STATUS = {
   TX: 'paid',
 };
 
+// สถานะเริ่มต้นของเอกสาร แยกตามฝั่ง AR (รายรับ) / AP (รายจ่าย)
+export function initialStatus(type, side = 'AR') {
+  if (side === 'AP') {
+    if (type === 'OP') return 'po_wait_invoice'; // รอรับใบแจ้งหนี้จากผู้ขาย
+    if (type === 'INV') return 'payment_pending'; // รออนุมัติจ่าย
+  }
+  return INITIAL_STATUS[type];
+}
+
 // ใบแจ้งหนี้ที่วางบิลได้ = ยังค้างชำระ
 export const OUTSTANDING = ['unpaid', 'due_soon', 'overdue'];
 
@@ -99,15 +108,17 @@ export async function createDocument(c, d) {
   const { rows } = await c.query(
     `INSERT INTO documents
       (doc_type, doc_no, ref_doc_id, ref_text, customer_po, customer_id, issue_date, due_date,
-       subtotal, vat, total, status, status_reason, source, source_ref, file_path, paid_at, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,CURRENT_DATE),$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       subtotal, vat, total, status, status_reason, source, source_ref, file_path, paid_at, created_by,
+       side, payment_terms)
+     VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,CURRENT_DATE),$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      RETURNING *`,
     [
       d.doc_type, docNo, refDocId, d.ref_text || null, d.customer_po || null, d.customer_id || null,
       d.issue_date || null, d.due_date || null, t.subtotal, t.vat, t.total,
-      d.status || INITIAL_STATUS[d.doc_type], d.status_reason || null,
+      d.status || initialStatus(d.doc_type, d.side), d.status_reason || null,
       d.source || 'manual', d.source_ref || null, d.file_path || null,
       d.doc_type === 'RC' ? new Date() : null, d.created_by || null,
+      d.side || 'AR', d.payment_terms || null,
     ]
   );
   const doc = rows[0];
@@ -129,7 +140,9 @@ export async function createDocument(c, d) {
 
   // อัปเดตสถานะเอกสารต้นทางตามสายเอกสาร QT -> OP -> INV
   if (refDocId) {
-    const link = { OP: ['QT', 'approved'], INV: ['OP', 'invoiced'] }[d.doc_type];
+    const link = d.doc_type === 'INV' && d.side === 'AP'
+      ? ['OP', 'po_invoiced'] // ฝั่ง AP: ได้รับใบแจ้งหนี้จากผู้ขายแล้ว
+      : { OP: ['QT', 'approved'], INV: ['OP', 'invoiced'] }[d.doc_type];
     if (link) {
       await c.query(
         `UPDATE documents SET status = $1, updated_at = now() WHERE id = $2 AND doc_type = $3`,

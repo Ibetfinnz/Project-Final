@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api.js';
-import { baht, dateTh, timeTh } from '../format.js';
-import { Card, Modal, PageHeader } from '../components.jsx';
+import { api } from '../../api.js';
+import { baht, dateTh, timeTh } from '../../format.js';
+import { Card, Modal, PageHeader } from '../../components.jsx';
 
 const RESULT = {
   matched: { label: 'Matched (ตรงกัน)', bg: '#c8f2d2', fg: '#0b5a24' },

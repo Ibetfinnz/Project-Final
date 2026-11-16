@@ -70,7 +70,7 @@ const NavIcon = ({ children }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
 );
 
-const NAV = [
+const NAV_AR = [
   { to: '/', label: 'แดชบอร์ดรายรับ', icon: <path d="M3 3h8v10H3zM13 3h8v6h-8zM13 11h8v10h-8zM3 15h8v6H3z" /> },
   { to: '/create', label: 'สร้างและส่งเอกสาร', icon: <path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8l-5-5zM14 3v5h5M12 11v6M9 14h6" /> },
   { to: '/documents', label: 'รายการเอกสารรายรับ', icon: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /> },
@@ -78,7 +78,16 @@ const NAV = [
   { to: '/upload', label: 'อัปโหลดเอกสาร', icon: <path d="M12 16V4M7 9l5-5 5 5M5 20h14" /> },
 ];
 
+const NAV_AP = [
+  { to: '/', label: 'แดชบอร์ดรายจ่าย', icon: <path d="M3 3h8v10H3zM13 3h8v6h-8zM13 11h8v10h-8zM3 15h8v6H3z" /> },
+  { to: '/create', label: 'สร้างและส่งเอกสาร', icon: <path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8l-5-5zM14 3v5h5M12 11v6M9 14h6" /> },
+  { to: '/documents', label: 'รายการเอกสารรายจ่าย', icon: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /> },
+  { to: '/verify', label: 'ตรวจสอบ 2-Way Matching และอนุมัติจ่าย', icon: <path d="M3 5h18v14H3zM3 10h18M7 15h4" /> },
+  { to: '/upload', label: 'อัปโหลดเอกสาร', icon: <path d="M12 16V4M7 9l5-5 5 5M5 20h14" /> },
+];
+
 export function Layout({ user, onLogout, children }) {
+  const NAV = user?.role === 'AP' ? NAV_AP : NAV_AR;
   return (
     <div className="shell">
       <aside className="sidebar">

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../api.js';
-import { baht } from '../format.js';
-import { Card, PageHeader } from '../components.jsx';
+import { api } from '../../api.js';
+import { baht } from '../../format.js';
+import { Card, PageHeader } from '../../components.jsx';
 
 const TYPES = { SLIP: 'สลิปโอนเงิน', OP: 'ใบสั่งซื้อ', INV: 'ใบแจ้งหนี้', BN: 'ใบวางบิล', RC: 'ใบเสร็จรับเงิน', TX: 'ใบกำกับภาษี' };
 const MATCH = { matched: 'ยอดตรงกับเอกสาร', mismatch: 'ยอดไม่ตรงกับเอกสาร', no_invoice: 'ไม่พบใบแจ้งหนี้ที่ตรงกัน' };
@@ -14,7 +14,8 @@ const DOC_FIELDS = [['doc_no', 'เลขที่เอกสาร'], ['ref_no
 const SLIP_FIELDS = [['amount', 'ยอดเงิน'], ['sender_name', 'ผู้โอน'], ['receiver_name', 'ผู้รับ'], ['bank', 'ธนาคาร'],
   ['transfer_datetime', 'วันเวลาโอน'], ['ref_no', 'รหัสอ้างอิง'], ['memo', 'บันทึกช่วยจำ']];
 
-export default function UploadFile() {
+export default function UploadFile({ user }) {
+  const isAP = user?.role === 'AP';
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [file, setFile] = useState(null);
@@ -178,7 +179,9 @@ export default function UploadFile() {
               <div className="ok">บันทึกสลิปสำเร็จ</div>
               <p>ผู้โอน: <b>{data.sender_name || '-'}</b> · ยอด: <b>{baht(Number(data.amount) || 0)}</b></p>
               <p>ผลจับคู่: <b>{MATCH[saved.match_result]}</b>{saved.doc_no && <> ({saved.doc_no})</>}</p>
-              <button className="btn teal" onClick={() => nav('/verify')}>ไปตรวจสอบสลิป</button>
+              <button className="btn teal" onClick={() => nav('/verify')}>
+                {isAP ? 'ไปตรวจสอบ 2-Way Matching' : 'ไปตรวจสอบสลิป'}
+              </button>
             </>
           ) : (
             <>

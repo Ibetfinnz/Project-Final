@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api, openBlob } from '../api.js';
-import { ALL_STATUSES, DOC_TYPES, STATUS, STATUS_BY_TYPE, baht, dateTh } from '../format.js';
-import { Card, Modal, PageHeader, StatusBadge } from '../components.jsx';
+import { api, openBlob } from '../../api.js';
+import { ALL_STATUSES, DOC_TYPES, STATUS, STATUS_BY_TYPE, baht, dateTh } from '../../format.js';
+import { Card, Modal, PageHeader, StatusBadge } from '../../components.jsx';
 
 /* ---------- ไอคอน ---------- */
 const Svg = ({ children, size = 17 }) => (
@@ -109,7 +109,7 @@ function DocLines({ d }) {
 }
 
 /* ---------- Drawer ด้านข้าง ---------- */
-function ViewDrawer({ doc, onClose, onEdit, onCreateInvoice, onNotifyCustomer, onConfirmPay }) {
+function ViewDrawer({ doc, onClose, onEdit, onCreateInvoice, onNotifyCustomer, onConfirmPay, isAP }) {
   const tabs = TABS_BY_TYPE[doc.doc_type] || ['detail'];
   const [tab, setTab] = useState('detail');
   const [full, setFull] = useState(null);
@@ -173,7 +173,7 @@ function ViewDrawer({ doc, onClose, onEdit, onCreateInvoice, onNotifyCustomer, o
                 <div className="act-col">
                   <button className="btn sm" onClick={() => openBlob(`/documents/${doc.id}/pdf`)}><IDownload size={14} /> ดาวน์โหลด PDF</button>
                 </div>
-                {t === 'OP' && (
+                {!isAP && t === 'OP' && (
                   <>
                     <div className="act-col">
                       <button className="btn sm" onClick={() => onNotifyCustomer?.(d)}><ISend /> แจ้งลูกค้าตรวจสอบ</button>
@@ -189,7 +189,7 @@ function ViewDrawer({ doc, onClose, onEdit, onCreateInvoice, onNotifyCustomer, o
                     <button className="btn sm" onClick={() => onEdit(doc)}><IPencil size={14} /> แก้ไข</button>
                   </div>
                 )}
-                {['INV', 'BN'].includes(t) && !has(statusLabel(d), 'ชำระแล้ว') && (
+                {!isAP && ['INV', 'BN'].includes(t) && !has(statusLabel(d), 'ชำระแล้ว') && (
                   <div className="act-col">
                     <button className="btn sm" onClick={() => onConfirmPay?.(d)}><IMoney /> ยืนยันการจ่าย</button>
                     <small className="hint">กรณีมีจ่ายเกินกำหนด</small>
@@ -236,7 +236,8 @@ function ViewDrawer({ doc, onClose, onEdit, onCreateInvoice, onNotifyCustomer, o
 }
 
 /* ---------- หน้ารายการ ---------- */
-export default function DocumentList() {
+export default function DocumentList({ user }) {
+  const isAP = user?.role === 'AP';
   const [params] = useSearchParams();
   const nav = useNavigate();
   const [rows, setRows] = useState([]);
@@ -275,7 +276,9 @@ export default function DocumentList() {
 
   return (
     <>
-      <PageHeader title="รายการเอกสารรายรับ" sub="List of income documents">
+      <PageHeader
+        title={isAP ? 'รายการเอกสารรายจ่าย' : 'รายการเอกสารรายรับ'}
+        sub={isAP ? 'List of expense documents' : 'List of income documents'}>
         <button className="btn green" onClick={() => nav('/create')}>+ สร้างเอกสาร</button>
       </PageHeader>
       {error && <div className="err">{error}</div>}
@@ -309,7 +312,7 @@ export default function DocumentList() {
         )}
 
         <div className="t-wrap"><table className="t">
-          <thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>วันที่ออก</th><th>ครบกำหนด</th><th className="r">ยอดเงิน (บาท)</th><th>สถานะ</th><th className="r">จัดการ</th></tr></thead>
+          <thead><tr><th>เลขที่เอกสาร</th><th>{isAP ? 'คู่ค้า' : 'ลูกค้า'}</th><th>วันที่ออก</th><th>ครบกำหนด</th><th className="r">ยอดเงิน (บาท)</th><th>สถานะ</th><th className="r">จัดการ</th></tr></thead>
           <tbody>
             {shown.length === 0 && <tr><td colSpan="7" className="empty">ไม่พบเอกสาร ลองเปลี่ยนตัวกรอง หรือสร้างเอกสารใหม่</td></tr>}
             {shown.map((d) => {
@@ -342,6 +345,7 @@ export default function DocumentList() {
           onClose={() => setView(null)}
           onEdit={(d) => setEdit({ ...d })}
           onConfirmPay={(d) => setEdit({ ...d })}
+          isAP={isAP}
           onCreateInvoice={(d) => nav(`/create?type=INV&ref=${encodeURIComponent(d.doc_no)}`)}
           onNotifyCustomer={(d) => alert('TODO: ส่งอีเมลแจ้งลูกค้า ' + d.doc_no)}
         />

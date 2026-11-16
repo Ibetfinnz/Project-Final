@@ -11,9 +11,15 @@ const SOURCES = { INV: ['OP'], BN: ['INV'], RC: ['INV', 'BN'] };
 // ต้นทางที่ "ถูกอ้างอิงโดยประเภทเหล่านี้แล้ว" จะไม่แสดงให้เลือกอีก
 const EXCLUDED_BY = { INV: ['INV'], BN: ['BN', 'RC'], RC: ['RC', 'BN'] };
 
+// ฝั่งเอกสารที่ผู้ใช้เห็น: AP เห็นเฉพาะรายจ่าย, AR เห็นเฉพาะรายรับ, EXEC ดูได้ทั้งสอง
+export const sideOf = (user) =>
+  user?.role === 'AP' ? 'AP' : user?.role === 'EXEC' ? null : 'AR';
+
 r.get('/', async (req, res) => {
   const { type, status, customer, q: search } = req.query;
   const w = [], p = [];
+  const side = sideOf(req.user) || (req.query.side === 'AP' ? 'AP' : req.query.side === 'AR' ? 'AR' : null);
+  if (side) { p.push(side); w.push(`d.side = $${p.length}`); }
   if (type) { p.push(type); w.push(`d.doc_type = $${p.length}`); }
   if (status) { p.push(status); w.push(`d.status = $${p.length}`); }
   if (customer) { p.push(customer); w.push(`d.customer_id = $${p.length}`); }
@@ -34,7 +40,8 @@ r.get('/linkable', async (req, res) => {
   if (!src) return res.json([]);
 
   const p = [src, EXCLUDED_BY[type]];
-  let extra = '';
+  let extra = ` AND d.side = $3`;
+  p.push(sideOf(req.user) || 'AR');
   if (customer) { p.push(customer); extra += ` AND d.customer_id = $${p.length}`; }
   if (type === 'BN') { p.push(OUTSTANDING); extra += ` AND d.status::text = ANY($${p.length})`; }
 
@@ -59,7 +66,11 @@ r.get('/:id', async (req, res) => {
 
 r.post('/', async (req, res) => {
   const b = req.body || {};
+  const side = sideOf(req.user) || (b.side === 'AP' ? 'AP' : 'AR');
   if (!['QT', 'OP', 'INV', 'BN', 'RC'].includes(b.doc_type)) return res.status(400).json({ error: 'ประเภทเอกสารไม่ถูกต้อง' });
+  if (side === 'AP' && b.doc_type !== 'OP') {
+    return res.status(403).json({ error: 'พนักงานบัญชีรายจ่ายสร้างได้เฉพาะใบสั่งซื้อ (PO)' });
+  }
   if (!b.customer_id) return res.status(400).json({ error: 'กรุณาเลือกลูกค้า' });
   // ใบวางบิลใช้ invoice_ids แทนรายการสินค้า
   if (b.doc_type !== 'BN' && (!Array.isArray(b.items) || !b.items.some((i) => i.description && Number(i.qty) > 0))) {
@@ -70,7 +81,7 @@ r.post('/', async (req, res) => {
   try {
     doc = await tx(async (c) => {
       const extra = b.doc_type === 'BN' ? await prepareBilling(c, b) : {};
-      return createDocument(c, { ...b, ...extra, created_by: req.user.id });
+      return createDocument(c, { ...b, ...extra, side, created_by: req.user.id });
     });
   } catch (e) {
     if (e.status) return res.status(e.status).json({ error: e.message });

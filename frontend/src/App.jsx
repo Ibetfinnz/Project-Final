@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components.jsx';
-import Login from './pages/Login.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import CreateDocument from './pages/CreateDocument.jsx';
-import DocumentList from './pages/DocumentList.jsx';
-import VerifyPayment from './pages/VerifyPayment.jsx';
-import UploadFile from './pages/UploadFile.jsx';
+import Login from './pages/commonAR+AP/Login.jsx';
+import Dashboard from './pages/AR/Dashboard.jsx';
+import DashboardAP from './pages/AP/Dashboard.jsx';
+import CreateDocument from './pages/commonAR+AP/CreateDocument.jsx';
+import DocumentList from './pages/commonAR+AP/DocumentList.jsx';
+import VerifyPayment from './pages/AR/VerifyPayment.jsx';
+import VerifyMatching from './pages/AP/VerifyMatching.jsx';
+import UploadFile from './pages/commonAR+AP/UploadFile.jsx';
 
 export default function App() {
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user') || 'null'));
@@ -31,11 +33,11 @@ export default function App() {
   return (
     <Layout user={user} onLogout={logout}>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/create" element={<CreateDocument />} />
-        <Route path="/documents" element={<DocumentList />} />
-        <Route path="/verify" element={<VerifyPayment />} />
-        <Route path="/upload" element={<UploadFile />} />
+        <Route path="/" element={user?.role === 'AP' ? <DashboardAP /> : <Dashboard />} />
+        <Route path="/create" element={<CreateDocument user={user} />} />
+        <Route path="/documents" element={<DocumentList user={user} />} />
+        <Route path="/verify" element={user?.role === 'AP' ? <VerifyMatching /> : <VerifyPayment />} />
+        <Route path="/upload" element={<UploadFile user={user} />} />
         <Route path="/login" element={<Navigate to="/" />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

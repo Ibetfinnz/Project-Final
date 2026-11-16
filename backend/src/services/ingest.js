@@ -1,4 +1,4 @@
-import { calcTotals, createDocument, prepareBilling, notify, INITIAL_STATUS } from './docs.js';
+import { calcTotals, createDocument, prepareBilling, notify, initialStatus } from './docs.js';
 
 export const TYPE_LABEL = {
   SLIP: 'สลิปโอนเงิน', OP: 'ใบสั่งซื้อ', INV: 'ใบแจ้งหนี้', BN: 'ใบวางบิล',
@@ -133,7 +133,7 @@ export async function checkChain(c, type, d, customerId) {
 
 // ---------- บันทึกเอกสาร (ต้องเรียกภายใน tx) ----------
 export async function saveDocument(c, o) {
-  const { type, d, source, source_ref, file_path = null, created_by = null, email_from = null, confidence = null } = o;
+  const { type, d, source, source_ref, file_path = null, created_by = null, email_from = null, confidence = null, side = 'AR' } = o;
 
   if (d.doc_no && type !== 'OP') {
     const dup = (await c.query('SELECT id, doc_no, status FROM documents WHERE doc_type = $1 AND doc_no = $2', [type, d.doc_no])).rows[0];
@@ -169,9 +169,9 @@ export async function saveDocument(c, o) {
     // ผูกกับเอกสารก่อนหน้าเฉพาะตอนตรวจผ่าน (RC ที่ผูกแล้วจะปิดใบแจ้งหนี้เป็นชำระแล้ว)
     ref_text: ok && chk.ref_doc_no ? chk.ref_doc_no : (d.ref_no || null),
     customer_po: type === 'OP' ? (d.customer_po_no || d.doc_no || null) : null,
-    source, source_ref, file_path, created_by,
+    source, source_ref, file_path, created_by, side,
     ...extra,
-    status: ok ? INITIAL_STATUS[type] : 'invalid',
+    status: ok ? initialStatus(type, side) : 'invalid',
     status_reason: ok ? null : errors.join('; '),
   });
 

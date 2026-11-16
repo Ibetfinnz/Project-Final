@@ -73,6 +73,7 @@ r.post('/:id/confirm', async (req, res) => {
     const d = await saveDocument(c, {
       type: doc_type, d: data, source: 'upload', source_ref: `upload:${up.id}`,
       file_path: up.file_path, created_by: req.user.id, confidence: null,
+      side: req.user.role === 'AP' ? 'AP' : 'AR',
     });
     if (d.duplicate) throw Object.assign(new Error(`มีเอกสารเลขที่ ${d.doc_no} ในระบบแล้ว`), { status: 409 });
     await c.query(`UPDATE uploads SET status='done', doc_type=$2, document_id=$3 WHERE id=$1`, [up.id, doc_type, d.id]);

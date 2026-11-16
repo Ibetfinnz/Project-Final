@@ -19,6 +19,11 @@ export const DOC_TYPES = {
 // สถานะทั้งหมดอยู่ที่เดียว: ป้ายชื่อ + สี (ตรงตามสเปก)
 export const STATUS = {
   pending_approval: { label: 'รออนุมัติ', bg: '#cfe8ff', fg: '#0b3b73' },
+  po_wait_invoice: { label: 'รอรับใบแจ้งหนี้', bg: '#e6d4ff', fg: '#4a1d8f' },
+  po_invoiced: { label: 'ได้รับใบแจ้งหนี้แล้ว', bg: '#f6d0f2', fg: '#7a1a72' },
+  payment_pending: { label: 'รออนุมัติจ่าย', bg: '#ddd6fe', fg: '#5b21b6' },
+  cancelled: { label: 'ยกเลิก', bg: '#e5e7eb', fg: '#374151' },
+  incomplete: { label: 'ยังไม่ครบถ้วน', bg: '#fef3c7', fg: '#92400e' },
   approved: { label: 'ได้รับอนุมัติแล้ว', bg: '#6f93d6', fg: '#071a3a' },
   rejected: { label: 'ไม่ได้รับการอนุมัติ', bg: '#ffb4b4', fg: '#7a0b0b' },
   wait_invoice: { label: 'รอทำใบแจ้งหนี้', bg: '#e6d4ff', fg: '#4a1d8f' },
@@ -35,9 +40,9 @@ export const STATUS = {
 
 export const STATUS_BY_TYPE = {
   QT: ['pending_approval', 'approved', 'rejected'],
-  OP: ['wait_invoice', 'invoiced', 'invalid'],
-  INV: ['unpaid', 'due_soon', 'slip_review', 'mismatch', 'overdue', 'paid'], // เพิ่ม due_soon
-  BN: ['unpaid', 'due_soon', 'mismatch', 'overdue', 'paid'], // เพิ่ม due_soon
+  OP: ['po_wait_invoice', 'po_invoiced', 'wait_invoice', 'invoiced', 'invalid', 'cancelled'],
+  INV: ['payment_pending', 'unpaid', 'due_soon', 'slip_review', 'mismatch', 'overdue', 'paid', 'cancelled'],
+  BN: ['unpaid', 'due_soon', 'mismatch', 'overdue', 'paid'],
   RC: ['paid'],
   TX: ['paid', 'invalid'],
 };

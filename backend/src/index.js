@@ -2,7 +2,7 @@ import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
 import { cfg } from './config.js';
-import { requireAuth, requireInternal } from './auth.js';
+import { requireAuth, requireInternal, requireRole } from './auth.js';
 import { startJobs } from './jobs/overdue.js';
 import authRoutes from './routes/auth.js';
 import customerRoutes from './routes/customers.js';
@@ -10,6 +10,7 @@ import documentRoutes from './routes/documents.js';
 import slipRoutes from './routes/slips.js';
 import uploadRoutes from './routes/upload.js';
 import dashboardRoutes from './routes/dashboard.js';
+import apRoutes from './routes/ap.js';
 import notificationRoutes from './routes/notifications.js';
 import internalRoutes from './routes/internal.js';
 
@@ -33,6 +34,7 @@ app.use('/api/documents', requireAuth, documentRoutes);
 app.use('/api/payment-slips', requireAuth, slipRoutes);
 app.use('/api/upload', requireAuth, uploadRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
+app.use('/api/ap', requireAuth, requireRole('AP', 'EXEC'), apRoutes);
 app.use('/api/notifications', requireAuth, notificationRoutes);
 
 app.use((err, _req, res, _next) => {

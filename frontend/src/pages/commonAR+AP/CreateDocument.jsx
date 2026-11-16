@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api } from '../api.js';
-import { DOC_TYPES, dateTh, num } from '../format.js';
-import { Card, Modal, PageHeader } from '../components.jsx';
+import { api } from '../../api.js';
+import { DOC_TYPES, dateTh, num } from '../../format.js';
+import { Card, Modal, PageHeader } from '../../components.jsx';
 
-const CREATABLE = ['QT', 'INV', 'BN', 'RC'];
+const CREATABLE_AR = ['QT', 'INV', 'BN', 'RC'];
+const CREATABLE_AP = ['OP']; // พนักงานบัญชีรายจ่ายสร้างได้เฉพาะใบสั่งซื้อ
 const emptyItem = () => ({ description: '', qty: 1, unit_price: 0 });
 
 // ประเภทที่มีช่องอ้างอิง (กติกาว่าอ้างอิงอะไรได้ อยู่ที่ backend: GET /documents/linkable)
@@ -16,9 +17,11 @@ const shortDate = (s) =>
 
 const billRow = { display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr) auto', gap: 12, alignItems: 'end', marginBottom: 8 };
 
-export default function CreateDocument() {
+export default function CreateDocument({ user }) {
+  const isAP = user?.role === 'AP';
+  const CREATABLE = isAP ? CREATABLE_AP : CREATABLE_AR;
   const [sp] = useSearchParams();
-  const initType = CREATABLE.includes(sp.get('type')) ? sp.get('type') : '';
+  const initType = isAP ? 'OP' : (CREATABLE.includes(sp.get('type')) ? sp.get('type') : '');
 
   const [customers, setCustomers] = useState([]);
   const [linkable, setLinkable] = useState([]);
@@ -154,7 +157,9 @@ export default function CreateDocument() {
 
   return (
     <>
-      <PageHeader title="สร้างและส่งเอกสาร" sub="Create and send documents" />
+      <PageHeader
+        title={isAP ? 'สร้างและส่งเอกสารใบสั่งซื้อ' : 'สร้างและส่งเอกสาร'}
+        sub={isAP ? 'Create and send PO' : 'Create and send documents'} />
       <div className="two-col">
         <Card>
           <h2>ข้อมูลเอกสาร</h2>
@@ -168,8 +173,8 @@ export default function CreateDocument() {
             <div className="field"><label>เลขที่เอกสาร</label>
               <input value={f.doc_no} onChange={(e) => set('doc_no', e.target.value)} placeholder="ว่างไว้ = ระบบสร้างให้อัตโนมัติ" /></div>
 
-            {/* ช่องอ้างอิงเดี่ยว: ไม่ใช้กับใบเสนอราคา (QT) และใบวางบิล (BN) */}
-            {f.doc_type !== 'QT' && !isBN && (
+            {/* ช่องอ้างอิงเดี่ยว: ไม่ใช้กับใบเสนอราคา (QT) ใบวางบิล (BN) และใบสั่งซื้อฝั่ง AP */}
+            {f.doc_type !== 'QT' && !isBN && !isAP && (
               <div className="field"><label>อ้างอิง (ถ้ามี)</label>
                 <select value={f.ref_text} disabled={!sources || linkable.length === 0} onChange={(e) => applyRef(e.target.value)}>
                   <option value="">{refPlaceholder}</option>
@@ -179,21 +184,23 @@ export default function CreateDocument() {
                 </select></div>
             )}
 
-            <div className="field"><label>{f.doc_type === 'QT' ? 'ยืนยันราคาถึงวันที่' : 'วันที่ออกเอกสาร'}</label>
+            <div className="field"><label>{f.doc_type === 'QT' ? 'ยืนยันราคาถึงวันที่' : isAP ? 'วันที่สั่ง' : 'วันที่ออกเอกสาร'}</label>
               <input type="date" value={f.issue_date} onChange={(e) => set('issue_date', e.target.value)} /></div>
-            {['INV', 'BN'].includes(f.doc_type) && (
-              <div className="field"><label>วันครบกำหนดชำระ</label><input type="date" value={f.due_date} onChange={(e) => set('due_date', e.target.value)} /></div>
+            {(['INV', 'BN'].includes(f.doc_type) || isAP) && (
+              <div className="field"><label>{isAP ? 'กำหนดส่งสินค้า' : 'วันครบกำหนดชำระ'}</label><input type="date" value={f.due_date} onChange={(e) => set('due_date', e.target.value)} /></div>
             )}
           </div>
           {locked && <p className="muted" style={{ margin: '0 0 6px', fontSize: 12 }}>ข้อมูลลูกค้าและรายการดึงมาจาก {f.ref_text} แก้ได้เฉพาะเลขที่เอกสาร วันที่ออก และวันครบกำหนดชำระ</p>}
 
-          <div className="section-title">ลูกค้า</div>
-          <div className="field"><label>ชื่อลูกค้า</label>
+          <div className="section-title">{isAP ? 'ผู้ขาย' : 'ลูกค้า'}</div>
+          <div className="field"><label>{isAP ? 'ชื่อคู่ค้า' : 'ชื่อลูกค้า'}</label>
             <select value={f.customer_id} disabled={locked} onChange={(e) => changeCustomer(e.target.value)}>
-              <option value="">-- เลือกลูกค้า --</option>
+              <option value="">{isAP ? '-- เลือกคู่ค้า --' : '-- เลือกลูกค้า --'}</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select></div>
-          <button className="btn sm" disabled={locked} onClick={() => setNewCust({ name: '', address: '', tax_id: '', email: '' })}>+ เพิ่มลูกค้าใหม่</button>
+          <button className="btn sm" disabled={locked} onClick={() => setNewCust({ name: '', address: '', tax_id: '', email: '' })}>
+            + {isAP ? 'เพิ่มคู่ค้าใหม่' : 'เพิ่มลูกค้าใหม่'}
+          </button>
 
           {isBN ? (
             <>
@@ -243,8 +250,8 @@ export default function CreateDocument() {
           )}
 
           <div className="section-title">การจัดส่ง</div>
-          <label><input type="checkbox" checked={f.send_email} onChange={(e) => set('send_email', e.target.checked)} /> ส่งอีเมลถึงลูกค้าอัตโนมัติพร้อมแนบไฟล์ PDF</label>
-          <div className="field" style={{ marginTop: 10 }}><label>อีเมลลูกค้า</label><input value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="อีเมลลูกค้า" /></div>
+          <label><input type="checkbox" checked={f.send_email} onChange={(e) => set('send_email', e.target.checked)} /> {isAP ? 'ส่งเอกสารให้คู่ค้าอัตโนมัติพร้อมแนบไฟล์ PDF' : 'ส่งอีเมลถึงลูกค้าอัตโนมัติพร้อมแนบไฟล์ PDF'}</label>
+          <div className="field" style={{ marginTop: 10 }}><label>{isAP ? 'อีเมลคู่ค้า' : 'อีเมลลูกค้า'}</label><input value={f.email} onChange={(e) => set('email', e.target.value)} placeholder={isAP ? 'อีเมลคู่ค้า' : 'อีเมลลูกค้า'} /></div>
           <div style={{ textAlign: 'right' }}>
             <button className="btn green" disabled={saveDisabled} onClick={save}>
               {busy ? 'กำลังบันทึก...' : f.send_email ? 'บันทึกเอกสารและส่งอีเมล' : 'บันทึกเอกสาร'}
@@ -256,8 +263,8 @@ export default function CreateDocument() {
           <h2>ตัวอย่างเอกสาร</h2>
           <div className="preview" style={{ marginTop: 12 }}>
             <h3>{DOC_TYPES[f.doc_type]?.label || 'เลือกประเภทเอกสาร'}</h3>
-            <p>ลูกค้า: <b>{customer?.name || '-'}</b><br />เลขผู้เสียภาษี {customer?.tax_id || '-'}</p>
-            <p>{f.doc_no && <>เลขที่ <b>{f.doc_no}</b> · </>}วันที่ {dateTh(f.issue_date)}{f.due_date && ` · ครบกำหนด ${dateTh(f.due_date)}`}{f.ref_text && !isBN && ` · อ้างอิง ${f.ref_text}`}</p>
+            <p>{isAP ? 'ผู้ขาย' : 'ลูกค้า'}: <b>{customer?.name || '-'}</b><br />เลขผู้เสียภาษี {customer?.tax_id || '-'}</p>
+            <p>{f.doc_no && <>เลขที่ <b>{f.doc_no}</b> · </>}วันที่ {dateTh(f.issue_date)}{f.due_date && ` · ${isAP ? 'กำหนดส่ง' : 'ครบกำหนด'} ${dateTh(f.due_date)}`}{f.ref_text && !isBN && ` · อ้างอิง ${f.ref_text}`}</p>
             {isBN ? (
               <table>
                 <thead><tr><th>#</th><th>เลขที่ใบแจ้งหนี้</th><th style={{ width: '24%' }}>วันที่</th><th style={{ width: '24%' }}>จำนวนเงิน</th></tr></thead>
@@ -281,13 +288,19 @@ export default function CreateDocument() {
               <div><span>ภาษีมูลค่าเพิ่ม 7%</span><span>{num(totals.vat)}</span></div>
               <div className="g"><span>ยอดรวมสุทธิ</span><span>{num(totals.total)}</span></div>
             </div>
+            {isAP && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, fontSize: 12 }}>
+                <div>ผู้สั่งซื้อ<br /><br />..............................</div>
+                <div>ผู้รับสินค้า<br /><br />..............................</div>
+              </div>
+            )}
           </div>
         </Card>
       </div>
 
       {newCust && (
-        <Modal title="เพิ่มลูกค้าใหม่" onClose={() => setNewCust(null)}>
-          {[['name', 'ชื่อบริษัท/ลูกค้า'], ['address', 'ที่อยู่'], ['tax_id', 'เลขประจำตัวผู้เสียภาษี (13 หลัก)'], ['email', 'อีเมล']].map(([k, label]) => (
+        <Modal title={isAP ? 'เพิ่มคู่ค้าใหม่' : 'เพิ่มลูกค้าใหม่'} onClose={() => setNewCust(null)}>
+          {[['name', isAP ? 'ชื่อบริษัท/คู่ค้า' : 'ชื่อบริษัท/ลูกค้า'], ['address', 'ที่อยู่'], ['tax_id', 'เลขประจำตัวผู้เสียภาษี (13 หลัก)'], ['email', 'อีเมล']].map(([k, label]) => (
             <div className="field" key={k}><label>{label}</label><input value={newCust[k]} onChange={(e) => setNewCust({ ...newCust, [k]: e.target.value })} /></div>
           ))}
           <button className="btn green" onClick={saveCustomer}>บันทึกลูกค้า</button>

@@ -142,3 +142,15 @@ ALTER TABLE uploads
   ADD COLUMN IF NOT EXISTS document_id   INT REFERENCES documents(id) ON DELETE SET NULL;
 
 ALTER TABLE payment_slips ADD COLUMN IF NOT EXISTS source_ref TEXT UNIQUE;
+
+-- ============================================================
+-- AP: พนักงานบัญชีรายจ่าย (Accounts Payable)
+-- แยกเอกสารฝั่งรายรับ (AR) กับรายจ่าย (AP) ด้วยคอลัมน์ side
+-- ============================================================
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS side TEXT NOT NULL DEFAULT 'AR';
+ALTER TABLE documents DROP CONSTRAINT IF EXISTS documents_side_check;
+ALTER TABLE documents ADD CONSTRAINT documents_side_check CHECK (side IN ('AR','AP'));
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS approved_by INT REFERENCES users(id);
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS payment_terms TEXT;
+CREATE INDEX IF NOT EXISTS idx_documents_side ON documents(side);

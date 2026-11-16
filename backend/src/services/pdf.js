@@ -14,6 +14,8 @@ const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<'
 
 export function renderHtml(doc) {
   const [th, en] = TITLES[doc.doc_type];
+  const isAP = doc.side === 'AP';
+  const partyLabel = isAP ? 'ผู้ขาย' : 'ลูกค้า';
   const rows = doc.items
     .map((i, n) => `<tr><td>${n + 1}</td><td>${esc(i.description)}</td><td class="r">${i.qty}</td><td class="r">${baht(i.unit_price)}</td><td class="r">${baht(i.amount)}</td></tr>`)
     .join('');
@@ -49,15 +51,16 @@ export function renderHtml(doc) {
     </div>
     <div class="info">
       <div class="cust">
-        <span style="color:#555">ลูกค้า</span> <span class="name">${esc(doc.customer_name || '-')}</span><br>
+        <span style="color:#555">${partyLabel}</span> <span class="name">${esc(doc.customer_name || '-')}</span><br>
         ${esc(doc.customer_address || '')}<br>
         เลขประจำตัวผู้เสียภาษี ${esc(doc.customer_tax_id || '-')}
       </div>
       <table class="docmeta">
         <tr><td>เลขที่</td><td>${esc(doc.doc_no)}</td></tr>
         <tr><td>วันที่ออก</td><td>${dateTh(doc.issue_date)}</td></tr>
-        ${doc.due_date ? `<tr><td>ครบกำหนด</td><td>${dateTh(doc.due_date)}</td></tr>` : ''}
+        ${doc.due_date ? `<tr><td>${isAP && doc.doc_type === 'OP' ? 'กำหนดส่งสินค้า' : 'ครบกำหนด'}</td><td>${dateTh(doc.due_date)}</td></tr>` : ''}
         ${doc.ref_text && !isBN ? `<tr><td>อ้างอิง</td><td>${esc(doc.ref_text)}</td></tr>` : ''}
+        ${doc.payment_terms ? `<tr><td>เงื่อนไขชำระ</td><td>${esc(doc.payment_terms)}</td></tr>` : ''}
       </table>
     </div>
     ${itemsTable}
