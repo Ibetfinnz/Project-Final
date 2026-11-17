@@ -125,8 +125,8 @@ export function Layout({ user, onLogout, children }) {
           <div className="topbar-right">
             <Bell />
             <button className="user" onClick={onLogout} title="ออกจากระบบ">
-              <span className="avatar">{user?.role || 'AR'}</span>
-              <span>{user?.name}</span>
+              <span className="avatar">{user?.role === 'EXEC' ? 'CEO' : (user?.role || 'AR')}</span>
+              <span>{user?.role === 'EXEC' ? 'CEO' : user?.name}</span>
             </button>
           </div>
         </header>

@@ -72,6 +72,12 @@ r.get('/overview', async (_req, res) => {
       )::int AS due,
       COALESCE(SUM(total), 0) AS total_amount,
       COALESCE(SUM(total) FILTER (WHERE status = 'paid'), 0) AS paid_amount,
+      COALESCE(SUM(total) FILTER (WHERE status IN (${APPROVED_SQL})), 0) AS approved_amount,
+      COALESCE(SUM(total) FILTER (
+        WHERE status NOT IN ('paid', 'cancelled')
+          AND due_date IS NOT NULL
+          AND due_date <= ${TODAY} + ${DUE_SOON_DAYS}
+      ), 0) AS due_amount,
       COALESCE(SUM(total) FILTER (WHERE status NOT IN ('paid', 'cancelled')), 0) AS outstanding_amount
     FROM documents`)).rows[0];
 
@@ -178,9 +184,25 @@ r.get('/finance', async (_req, res) => {
         WHERE side = 'AP' AND doc_type = 'INV' AND status = 'paid'
           AND date_trunc('month', paid_at) = date_trunc('month', now())), 0) AS month_expense,
       COALESCE(SUM(total) FILTER (
+        WHERE side = 'AR' AND doc_type = 'INV' AND status = 'paid'
+          AND paid_at >= CURRENT_DATE - 29), 0) AS period_income,
+      COALESCE(SUM(total) FILTER (
+        WHERE side = 'AP' AND doc_type = 'INV' AND status = 'paid'
+          AND paid_at >= CURRENT_DATE - 29), 0) AS period_expense,
+      COALESCE(SUM(total) FILTER (
+        WHERE side = 'AR' AND doc_type = 'INV' AND status = 'paid'
+          AND paid_at >= CURRENT_DATE - 59 AND paid_at < CURRENT_DATE - 29), 0) AS prev_income,
+      COALESCE(SUM(total) FILTER (
+        WHERE side = 'AP' AND doc_type = 'INV' AND status = 'paid'
+          AND paid_at >= CURRENT_DATE - 59 AND paid_at < CURRENT_DATE - 29), 0) AS prev_expense,
+      COALESCE(SUM(total) FILTER (
         WHERE side = 'AR' AND status NOT IN ('paid', 'cancelled')), 0) AS ar_outstanding,
+      COUNT(*) FILTER (
+        WHERE side = 'AR' AND status NOT IN ('paid', 'cancelled'))::int AS ar_outstanding_count,
       COALESCE(SUM(total) FILTER (
         WHERE side = 'AP' AND status NOT IN ('paid', 'cancelled')), 0) AS ap_outstanding,
+      COUNT(*) FILTER (
+        WHERE side = 'AP' AND status NOT IN ('paid', 'cancelled'))::int AS ap_outstanding_count,
       COALESCE(SUM(total) FILTER (WHERE side = 'AR' AND status = 'overdue'), 0) AS ar_overdue,
       COALESCE(SUM(total) FILTER (WHERE side = 'AP' AND status = 'overdue'), 0) AS ap_overdue
     FROM documents`)).rows[0];
@@ -229,12 +251,16 @@ r.get('/finance', async (_req, res) => {
 
   const income = Number(kpis.income || 0);
   const expense = Number(kpis.expense || 0);
+  const periodIncome = Number(kpis.period_income || 0);
+  const periodExpense = Number(kpis.period_expense || 0);
 
   res.json({
     kpis: {
       ...kpis,
       net: income - expense,
       ratio: expense > 0 ? income / expense : null,
+      period_net: periodIncome - periodExpense,
+      prev_net: Number(kpis.prev_income || 0) - Number(kpis.prev_expense || 0),
     },
     cashflow: await cashflowSeries(CASHFLOW_DAYS),
     aging,
