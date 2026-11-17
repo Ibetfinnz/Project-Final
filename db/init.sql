@@ -154,3 +154,16 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS approved_by INT REFERENCES users(id);
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS payment_terms TEXT;
 CREATE INDEX IF NOT EXISTS idx_documents_side ON documents(side);
+
+-- ============================================================
+-- ประวัติการแก้ไขเอกสาร (แท็บ "ประวัติการแก้ไข" ในหน้ารายละเอียด)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS document_history (
+  id SERIAL PRIMARY KEY,
+  document_id INT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  action TEXT NOT NULL DEFAULT 'edited',   -- created | edited
+  text TEXT NOT NULL,
+  by_user INT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_document_history_doc ON document_history(document_id, created_at DESC);

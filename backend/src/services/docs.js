@@ -23,6 +23,91 @@ export const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 10
 
 const bad = (message) => Object.assign(new Error(message), { status: 400 });
 
+// ป้ายชื่อสถานะสำหรับข้อความในประวัติการแก้ไข
+export const STATUS_LABEL = {
+  pending_approval: 'รออนุมัติ',
+  po_wait_invoice: 'รอรับใบแจ้งหนี้',
+  po_invoiced: 'ได้รับใบแจ้งหนี้แล้ว',
+  payment_pending: 'รออนุมัติจ่าย',
+  cancelled: 'ยกเลิก',
+  incomplete: 'ยังไม่ครบถ้วน',
+  approved: 'ได้รับอนุมัติแล้ว',
+  rejected: 'ไม่ได้รับการอนุมัติ',
+  wait_invoice: 'รอทำใบแจ้งหนี้',
+  invoiced: 'ทำใบแจ้งหนี้แล้ว',
+  invalid: 'ข้อมูลไม่ถูกต้อง',
+  unpaid: 'รอชำระ',
+  due_soon: 'ใกล้ครบกำหนดชำระ',
+  slip_review: 'รอตรวจสอบสลิป',
+  mismatch: 'ข้อมูลไม่ตรง',
+  overdue: 'เกินกำหนด',
+  paid: 'ชำระแล้ว',
+};
+export const statusText = (s) => STATUS_LABEL[s] || s || '-';
+
+// ตรวจเอกสารกับเอกสารอ้างอิงอีกครั้งจากข้อมูลจริงในฐานข้อมูล
+// ใช้หลังแก้ไขเอกสาร เพื่อไม่ให้ผลตรวจเดิม (check_result/check_notes) ค้างอยู่
+export async function recheckDocument(c, id) {
+  const doc = (await c.query('SELECT * FROM documents WHERE id = $1', [id])).rows[0];
+  if (!doc) return null;
+  const near = (a, b) => Math.abs(Number(a || 0) - Number(b || 0)) <= 0.01;
+  const notes = [];
+  let result = 'no_reference';
+
+  if (doc.doc_type === 'BN') {
+    // ใบวางบิล: เทียบผลรวมกับใบแจ้งหนี้ที่วางบิลทั้งหมด
+    const { rows: invs } = await c.query(
+      `SELECT x.id, x.doc_no, x.total, x.customer_id
+       FROM document_refs r JOIN documents x ON x.id = r.ref_document_id
+       WHERE r.document_id = $1 AND x.doc_type = 'INV' ORDER BY x.id`, [id]);
+    if (!invs.length) {
+      notes.push('ไม่พบใบแจ้งหนี้ที่วางบิล');
+    } else {
+      if (doc.customer_id && invs.some((x) => String(x.customer_id) !== String(doc.customer_id))) {
+        notes.push('มีใบแจ้งหนี้ของลูกค้าคนละราย');
+      }
+      const sum = round2(invs.reduce((s, x) => s + Number(x.total || 0), 0));
+      if (!near(sum, doc.total)) notes.push(`ผลรวมใบแจ้งหนี้ ${sum} ต่างจากใบวางบิล ${doc.total}`);
+      result = notes.length ? 'mismatch' : 'matched';
+    }
+  } else if (['INV', 'RC', 'TX'].includes(doc.doc_type)) {
+    // ใบแจ้งหนี้/ใบเสร็จ: เทียบกับเอกสารต้นทาง (INV -> OP, RC/TX -> INV/BN)
+    const types = doc.doc_type === 'INV' ? ['OP'] : ['INV', 'BN'];
+    let ref = null;
+    if (doc.ref_doc_id) {
+      ref = (await c.query(
+        'SELECT * FROM documents WHERE id = $1 AND doc_type = ANY($2)', [doc.ref_doc_id, types])).rows[0] || null;
+    }
+    if (!ref && doc.ref_text) {
+      ref = (await c.query(
+        'SELECT * FROM documents WHERE doc_no = $1 AND doc_type = ANY($2)', [doc.ref_text, types])).rows[0] || null;
+    }
+    if (!ref) {
+      notes.push('ไม่พบเอกสารอ้างอิง');
+    } else {
+      if (!near(ref.total, doc.total)) notes.push(`ยอด ${doc.total} ต่างจาก ${ref.doc_no} (${ref.total})`);
+      if (doc.customer_id && ref.customer_id && String(ref.customer_id) !== String(doc.customer_id)) {
+        notes.push(`ลูกค้าไม่ตรงกับ ${ref.doc_no}`);
+      }
+      result = notes.length ? 'mismatch' : 'matched';
+    }
+  } else {
+    return null; // QT/OP ไม่มีเอกสารก่อนหน้าให้ตรวจ
+  }
+
+  await c.query('UPDATE documents SET check_result = $2, check_notes = $3 WHERE id = $1',
+    [id, result, JSON.stringify(notes)]);
+  return { result, notes };
+}
+
+// บันทึกประวัติ (ใช้ทั้งตอนสร้างและตอนแก้ไข)
+export async function recordHistory(c, documentId, byUser, text, action = 'edited') {
+  await c.query(
+    'INSERT INTO document_history(document_id, action, text, by_user) VALUES ($1,$2,$3,$4)',
+    [documentId, action, text, byUser || null]
+  );
+}
+
 // คำนวณยอดฝั่งเซิร์ฟเวอร์เสมอ ไม่เชื่อค่าจาก Frontend/OCR
 export function calcTotals(items = [], vatEnabled = true) {
   const lines = items.map((i) => ({
@@ -53,7 +138,7 @@ export async function nextDocNo(c, type) {
  * - ต้องเป็น INV ของลูกค้าคนเดียวกัน, ยังค้างชำระ, และยังไม่ถูก BN/RC อื่นอ้างอิง
  * - ยอดรวม = ผลรวมของแต่ละใบ (ไม่คิด VAT ซ้ำ)
  */
-export async function prepareBilling(c, b) {
+export async function prepareBilling(c, b, excludeDocId = null) {
   const ids = [...new Set((b.invoice_ids || []).map(Number).filter(Boolean))];
   if (!ids.length) throw bad('กรุณาเลือกใบแจ้งหนี้อย่างน้อย 1 ใบ');
 
@@ -71,10 +156,12 @@ export async function prepareBilling(c, b) {
   const used = await c.query(
     `SELECT d.doc_no FROM documents d
      WHERE d.id = ANY($1::int[])
-       AND (EXISTS (SELECT 1 FROM documents x WHERE x.doc_type::text IN ('BN','RC') AND x.ref_doc_id = d.id)
+       AND (EXISTS (SELECT 1 FROM documents x WHERE x.doc_type::text IN ('BN','RC') AND x.ref_doc_id = d.id
+                    AND ($2::int IS NULL OR x.id <> $2))
          OR EXISTS (SELECT 1 FROM document_refs r JOIN documents x ON x.id = r.document_id
-                    WHERE r.ref_document_id = d.id AND x.doc_type::text IN ('BN','RC')))`,
-    [ids]
+                    WHERE r.ref_document_id = d.id AND x.doc_type::text IN ('BN','RC')
+                    AND ($2::int IS NULL OR x.id <> $2)))`,
+    [ids, excludeDocId]
   );
   if (used.rows.length) {
     throw bad(`${used.rows.map((r) => r.doc_no).join(', ')} ถูกอ้างอิงโดยใบวางบิลหรือใบเสร็จอื่นแล้ว`);
@@ -151,20 +238,29 @@ export async function createDocument(c, d) {
     }
   }
 
-  // ออกใบเสร็จ = ชำระแล้ว: ปิดทั้งสายต้นทาง (BN -> INV ทุกใบที่อยู่ในนั้น)
+  // ออกใบเสร็จ = ชำระแล้ว: ปิดทั้งสายเอกสาร (ใบสั่งซื้อ/ใบแจ้งหนี้/ใบวางบิล ในชุดเดียวกัน)
   if (['RC', 'TX'].includes(d.doc_type) && linkIds.length) {
     await c.query(
-      `WITH RECURSIVE ancestors(id) AS (
+      `WITH RECURSIVE edges AS (
+         SELECT document_id AS a, ref_document_id AS b FROM document_refs
+         UNION
+         SELECT id, ref_doc_id FROM documents WHERE ref_doc_id IS NOT NULL
+       ),
+       rel(id) AS (
          SELECT unnest($1::int[])
          UNION
-         SELECT r.ref_document_id FROM document_refs r JOIN ancestors a ON r.document_id = a.id
+         SELECT CASE WHEN e.a = r.id THEN e.b ELSE e.a END
+         FROM edges e JOIN rel r ON e.a = r.id OR e.b = r.id
        )
        UPDATE documents SET status = 'paid', paid_at = COALESCE(paid_at, now()), updated_at = now()
-       WHERE id IN (SELECT id FROM ancestors)
-         AND doc_type IN ('INV', 'BN') AND status <> 'paid'`,
+       WHERE id IN (SELECT id FROM rel)
+         AND doc_type IN ('OP', 'INV', 'BN') AND status <> 'paid'`,
       [linkIds]
     );
   }
+
+  // ประวัติ: บันทึกการสร้างเอกสาร
+  await recordHistory(c, doc.id, d.created_by, `สร้างเอกสาร ${docNo}`, 'created');
   return doc;
 }
 
@@ -188,26 +284,23 @@ export async function getDocument(c, id) {
     [id]
   );
 
-  // สายเอกสารทั้งหมด: ต้นทางทุกชั้น + ปลายทางทุกชั้น + ตัวมันเอง
+  // สายเอกสารทั้งหมด: เอกสารทุกใบที่เชื่อมโยงกัน (ไล่ได้ทั้งต้นทางและปลายทาง)
+  // ใช้ connected component เพื่อให้ใบวางบิล/ใบเสร็จเห็นใบสั่งซื้อในสายเดียวกันด้วย
   const rel = await c.query(
     `WITH RECURSIVE edges AS (
-       SELECT document_id AS child, ref_document_id AS parent FROM document_refs
+       SELECT document_id AS a, ref_document_id AS b FROM document_refs
        UNION
        SELECT id, ref_doc_id FROM documents WHERE ref_doc_id IS NOT NULL
      ),
-     ancestors(id) AS (
-       SELECT parent FROM edges WHERE child = $1
+     rel(id) AS (
+       SELECT $1::int
        UNION
-       SELECT e.parent FROM edges e JOIN ancestors a ON e.child = a.id
-     ),
-     descendants(id) AS (
-       SELECT child FROM edges WHERE parent = $1
-       UNION
-       SELECT e.child FROM edges e JOIN descendants x ON e.parent = x.id
+       SELECT CASE WHEN e.a = r.id THEN e.b ELSE e.a END
+       FROM edges e JOIN rel r ON e.a = r.id OR e.b = r.id
      )
      SELECT d.id, d.doc_type, d.doc_no, d.issue_date
      FROM documents d
-     WHERE d.id = $1 OR d.id IN (SELECT id FROM ancestors) OR d.id IN (SELECT id FROM descendants)
+     WHERE d.id IN (SELECT id FROM rel)
      ORDER BY d.issue_date, d.id`,
     [id]
   );
@@ -224,7 +317,16 @@ export async function getDocument(c, id) {
   slips.rows.forEach((s) => chain.push({ id: null, doc_type: 'PAY', label: 'การจ่ายเงิน (โอนเงิน)', at: s.at }));
   chain.sort((a, b) => (CHAIN_ORDER[a.doc_type] || 99) - (CHAIN_ORDER[b.doc_type] || 99)); // sort เสถียร ประเภทเดียวกันคงลำดับวันที่เดิม
 
-  return { ...rows[0], items: items.rows, linked: linked.rows, chain };
+  // ประวัติการแก้ไข (ใหม่สุดก่อน)
+  const history = await c.query(
+    `SELECT h.id, h.action, h.text, h.created_at AS at, u.name AS by
+     FROM document_history h LEFT JOIN users u ON u.id = h.by_user
+     WHERE h.document_id = $1
+     ORDER BY h.created_at DESC, h.id DESC`,
+    [id]
+  );
+
+  return { ...rows[0], items: items.rows, linked: linked.rows, chain, history: history.rows };
 }
 
 export async function notify(c, message, link = null) {

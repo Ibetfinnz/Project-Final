@@ -40,7 +40,7 @@ export const STATUS = {
 
 export const STATUS_BY_TYPE = {
   QT: ['pending_approval', 'approved', 'rejected'],
-  OP: ['po_wait_invoice', 'po_invoiced', 'wait_invoice', 'invoiced', 'invalid', 'cancelled'],
+  OP: ['po_wait_invoice', 'po_invoiced', 'wait_invoice', 'invoiced', 'invalid', 'cancelled', 'paid'],
   INV: ['payment_pending', 'unpaid', 'due_soon', 'slip_review', 'mismatch', 'overdue', 'paid', 'cancelled'],
   BN: ['unpaid', 'due_soon', 'mismatch', 'overdue', 'paid'],
   RC: ['paid'],

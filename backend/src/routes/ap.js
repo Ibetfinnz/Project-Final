@@ -158,6 +158,9 @@ r.get('/matching', async (_req, res) => {
     LEFT JOIN customers c ON c.id = d.customer_id
     LEFT JOIN LATERAL (${PO_OF}) po ON true
     WHERE d.side = 'AP' AND d.doc_type = 'INV'
+      -- ใบที่อนุมัติจ่ายแล้ว/ชำระแล้ว/ยกเลิก ไม่ต้องแสดงในตารางตรวจสอบอีก
+      AND d.approved_at IS NULL
+      AND d.status NOT IN ('paid', 'cancelled')
     ORDER BY d.created_at DESC, d.id DESC LIMIT 300`);
 
   const ids = [...new Set(rows.flatMap((x) => [x.id, x.po_id]).filter(Boolean))];
