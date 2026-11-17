@@ -5,25 +5,24 @@
 <title>Database Schema — AR/AP System</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #f6f8fb; }
+  html, body { margin: 0; padding: 0; background: #f7f9fc; }
   body {
     font-family: "Inter", "Segoe UI", "Noto Sans Thai", "Leelawadee UI", sans-serif;
     color: #1f2937;
-    padding: 26px 30px 34px;
+    padding: 26px 30px 30px;
   }
-  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 20px 2px; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 18px 2px; }
   .page-head h1 { margin: 0 0 4px; font-size: 20px; font-weight: 700; color: #0f2f4f; letter-spacing: .2px; }
   .page-head .sub { font-size: 12px; color: #6b7c93; }
   .legend { display: flex; align-items: center; gap: 16px; font-size: 11.5px; color: #5b6b7f; padding-bottom: 2px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { display: inline-block; width: 22px; height: 2px; background: #8aa6c2; border-radius: 2px; }
-  .legend b { font-weight: 600; }
 
-  #canvas { position: relative; width: 1290px; height: 1110px; }
-  #wires { position: absolute; inset: 0; width: 1290px; height: 1110px; overflow: visible; }
+  #canvas { position: relative; width: 1240px; height: 1060px; }
+  #wires { position: absolute; inset: 0; width: 1240px; height: 1060px; overflow: visible; }
 
   .tbl {
-    position: absolute; width: 330px; background: #fff;
+    position: absolute; width: 320px; background: #fff;
     border: 1px solid #d6dfea; border-radius: 5px;
     box-shadow: 0 1px 3px rgba(16, 24, 40, .07);
   }
@@ -36,29 +35,29 @@
   }
   .tbl h3 svg { flex: 0 0 auto; opacity: .9; }
   .row {
-    display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 3px;
-    height: 19px; padding: 0 8px; font-size: 11.5px;
+    display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 3px;
+    height: 19px; padding: 0 9px; font-size: 11.5px;
     border-top: 1px solid #f1f4f8;
   }
   .row:nth-child(2) { border-top: none; }
   .row:nth-child(even) { background: #fbfcfe; }
   .k { justify-self: start; font-size: 8px; font-weight: 700; line-height: 1; padding: 2px 3px; border-radius: 3px; letter-spacing: .2px; }
-  .k.empty { padding: 0; }
   .k.PK { background: #fdf0c3; color: #8a6100; }
   .k.FK { background: #dbeafe; color: #1d4ed8; }
   .k.PFK { background: #e5e7eb; color: #374151; }
+  .k.empty { padding: 0; }
   .nm { color: #243b53; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nm.pk { font-weight: 600; }
   .ty { color: #829ab1; font-size: 10px; white-space: nowrap; }
 
-  .foot { margin-top: 14px; font-size: 11px; color: #8a9aad; }
+  .foot { margin-top: 12px; font-size: 11px; color: #8a9aad; }
 </style>
 </head>
 <body>
   <div class="page-head">
     <div>
       <h1>Database Schema — ระบบบัญชี AR/AP</h1>
-      <div class="sub">PostgreSQL 16 · 11 ตาราง · ระบบเอกสารรายรับ–รายจ่าย / 2-Way Matching / ประวัติการแก้ไข</div>
+      <div class="sub">PostgreSQL 16 · 11 ตาราง · เอกสารรายรับ–รายจ่าย / 2-Way Matching / ประวัติการแก้ไข</div>
     </div>
     <div class="legend">
       <span><b class="k PK">PK</b> Primary Key</span>
@@ -69,92 +68,93 @@
   </div>
 
   <div id="canvas"></div>
-  <div class="foot">เอกสารอ้างอิง: docs/schema.dbml (นำไปเปิดใน dbdiagram.io เพื่อแก้ไข/ส่งออกใหม่ได้)</div>
+  <div class="foot">ต้นฉบับ: docs/schema-diagram.html · DBML: docs/schema.dbml (เปิดใน dbdiagram.io เพื่อแก้ไข/ส่งออก)</div>
 
 <script>
-const ROW_H = 19, HEAD_H = 32, W = 330;
+const ROW_H = 19, HEAD_H = 32, W = 320;
 
+// ชนิดข้อมูลแสดงแบบ PostgreSQL (int4/text/timestamptz/numeric/jsonb) เหมือนภาพอ้างอิง
 const S = {
-  users: {
-    x: 40, y: 40, cols: [
-      ['id', 'integer', 'PK'], ['name', 'text'], ['email', 'text'],
-      ['password_hash', 'text'], ['role', 'text'], ['created_at', 'timestamptz'],
+  document_line_items: {
+    x: 30, y: 40, cols: [
+      ['id', 'int4', 'PK'], ['document_id', 'int4', 'FK'], ['description', 'text'],
+      ['qty', 'numeric(14,2)'], ['unit_price', 'numeric(14,2)'], ['amount', 'numeric(14,2)'],
+    ],
+  },
+  payments: {
+    x: 400, y: 40, cols: [
+      ['id', 'int4', 'PK'], ['upload_id', 'int4', 'FK'], ['transfer_at', 'timestamptz'],
+      ['amount', 'numeric(14,2)'], ['sender_name', 'text'], ['ref_no', 'text'],
+      ['matched_document_id', 'int4', 'FK'], ['match_result', 'text'], ['verified', 'boolean'],
+      ['file_path', 'text'], ['ocr_raw', 'jsonb'], ['created_at', 'timestamptz'],
+    ],
+  },
+  document_refs: {
+    x: 880, y: 40, cols: [
+      ['document_id', 'int4', 'PFK'], ['ref_document_id', 'int4', 'PFK'],
+    ],
+  },
+  source_files: {
+    x: 30, y: 220, cols: [
+      ['id', 'int4', 'PK'], ['file_path', 'text'], ['original_name', 'text'],
+      ['mime', 'text'], ['note', 'text'], ['status', 'text'],
+      ['error', 'text'], ['slip_id', 'int4'], ['uploaded_by', 'int4', 'FK'],
+      ['created_at', 'timestamptz'], ['doc_type', 'text'], ['ocr_data', 'jsonb'],
+      ['check_preview', 'jsonb'], ['source_ref', 'text'], ['document_id', 'int4', 'FK'],
     ],
   },
   customers: {
-    x: 40, y: 250, cols: [
-      ['id', 'integer', 'PK'], ['name', 'text'], ['address', 'text'],
+    x: 880, y: 160, cols: [
+      ['id', 'int4', 'PK'], ['name', 'text'], ['address', 'text'],
       ['tax_id', 'text'], ['email', 'text'], ['created_at', 'timestamptz'],
     ],
   },
   documents: {
-    x: 420, y: 40, cols: [
-      ['id', 'integer', 'PK'], ['doc_type', 'text'], ['doc_no', 'text'],
-      ['ref_doc_id', 'integer', 'FK'], ['ref_text', 'text'], ['customer_po', 'text'],
-      ['customer_id', 'integer', 'FK'], ['issue_date', 'date'], ['due_date', 'date'],
+    x: 400, y: 340, cols: [
+      ['id', 'int4', 'PK'], ['doc_type', 'text'], ['doc_no', 'text'],
+      ['ref_doc_id', 'int4', 'FK'], ['ref_text', 'text'], ['customer_po', 'text'],
+      ['customer_id', 'int4', 'FK'], ['issue_date', 'date'], ['due_date', 'date'],
       ['subtotal', 'numeric(14,2)'], ['vat', 'numeric(14,2)'], ['total', 'numeric(14,2)'],
       ['status', 'text'], ['status_reason', 'text'], ['source', 'text'],
       ['source_ref', 'text'], ['file_path', 'text'], ['paid_at', 'timestamptz'],
-      ['created_by', 'integer', 'FK'], ['created_at', 'timestamptz'], ['updated_at', 'timestamptz'],
+      ['created_by', 'int4', 'FK'], ['created_at', 'timestamptz'], ['updated_at', 'timestamptz'],
       ['check_result', 'text'], ['check_notes', 'jsonb'], ['side', 'text'],
-      ['approved_at', 'timestamptz'], ['approved_by', 'integer', 'FK'], ['payment_terms', 'text'],
-    ],
-  },
-  document_line_items: {
-    x: 40, y: 450, cols: [
-      ['id', 'integer', 'PK'], ['document_id', 'integer', 'FK'], ['description', 'text'],
-      ['qty', 'numeric(14,2)'], ['unit_price', 'numeric(14,2)'], ['amount', 'numeric(14,2)'],
-    ],
-  },
-  document_refs: {
-    x: 40, y: 620, cols: [
-      ['document_id', 'integer', 'PFK'], ['ref_document_id', 'integer', 'PFK'],
+      ['approved_at', 'timestamptz'], ['approved_by', 'int4', 'FK'], ['payment_terms', 'text'],
     ],
   },
   document_history: {
-    x: 40, y: 760, cols: [
-      ['id', 'integer', 'PK'], ['document_id', 'integer', 'FK'], ['action', 'text'],
-      ['text', 'text'], ['by_user', 'integer', 'FK'], ['created_at', 'timestamptz'],
-    ],
-  },
-  source_files: {
-    x: 420, y: 630, cols: [
-      ['id', 'integer', 'PK'], ['file_path', 'text'], ['original_name', 'text'],
-      ['mime', 'text'], ['note', 'text'], ['status', 'text'],
-      ['error', 'text'], ['slip_id', 'integer'], ['uploaded_by', 'integer', 'FK'],
-      ['created_at', 'timestamptz'], ['doc_type', 'text'], ['ocr_data', 'jsonb'],
-      ['check_preview', 'jsonb'], ['source_ref', 'text'], ['document_id', 'integer', 'FK'],
-    ],
-  },
-  doc_counters: {
-    x: 420, y: 985, cols: [
-      ['doc_type', 'text', 'PK'], ['year', 'integer', 'PK'], ['last_no', 'integer'],
-    ],
-  },
-  payments: {
-    x: 900, y: 40, cols: [
-      ['id', 'integer', 'PK'], ['upload_id', 'integer', 'FK'], ['transfer_at', 'timestamptz'],
-      ['amount', 'numeric(14,2)'], ['sender_name', 'text'], ['ref_no', 'text'],
-      ['matched_document_id', 'integer', 'FK'], ['match_result', 'text'], ['verified', 'boolean'],
-      ['file_path', 'text'], ['ocr_raw', 'jsonb'], ['created_at', 'timestamptz'],
+    x: 30, y: 570, cols: [
+      ['id', 'int4', 'PK'], ['document_id', 'int4', 'FK'], ['action', 'text'],
+      ['text', 'text'], ['by_user', 'int4', 'FK'], ['created_at', 'timestamptz'],
     ],
   },
   notifications: {
-    x: 900, y: 360, cols: [
-      ['id', 'integer', 'PK'], ['message', 'text'], ['link', 'text'],
+    x: 880, y: 520, cols: [
+      ['id', 'int4', 'PK'], ['message', 'text'], ['link', 'text'],
       ['is_read', 'boolean'], ['created_at', 'timestamptz'],
     ],
   },
   ocr_logs: {
-    x: 900, y: 540, cols: [
-      ['id', 'integer', 'PK'], ['source', 'text'], ['source_ref', 'text'],
+    x: 880, y: 700, cols: [
+      ['id', 'int4', 'PK'], ['source', 'text'], ['source_ref', 'text'],
       ['raw', 'jsonb'], ['confidence', 'numeric'], ['ok', 'boolean'],
       ['errors', 'jsonb'], ['created_at', 'timestamptz'],
     ],
   },
+  users: {
+    x: 30, y: 750, cols: [
+      ['id', 'int4', 'PK'], ['name', 'text'], ['email', 'text'],
+      ['password_hash', 'text'], ['role', 'text'], ['created_at', 'timestamptz'],
+    ],
+  },
+  doc_counters: {
+    x: 400, y: 920, cols: [
+      ['doc_type', 'text', 'PK'], ['year', 'int4', 'PK'], ['last_no', 'int4'],
+    ],
+  },
 };
 
-// [ตารางต้นทาง, คอลัมน์, ตารางปลายทาง, คอลัมน์, ชนิดเส้น]
+// [ตารางต้นทาง, คอลัมน์, ตารางปลายทาง, คอลัมน์]
 const RELS = [
   ['documents', 'customer_id', 'customers', 'id'],
   ['documents', 'created_by', 'users', 'id'],
@@ -174,8 +174,8 @@ const canvas = document.getElementById('canvas');
 const SVGNS = 'http://www.w3.org/2000/svg';
 const svg = document.createElementNS(SVGNS, 'svg');
 svg.setAttribute('id', 'wires');
-svg.setAttribute('width', 1290);
-svg.setAttribute('height', 1110);
+svg.setAttribute('width', 1240);
+svg.setAttribute('height', 1060);
 canvas.appendChild(svg);
 
 const tableIcon = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">' +
@@ -240,48 +240,42 @@ function wire(pts) {
   }
 }
 
-let leftOffset = 0;
+let midOffset = 0;
 let rightOffset = 0;
+let leftOffset = 0;
 
 for (const [sName, sCol, dName, dCol] of RELS) {
   const s = S[sName], d = S[dName];
   const sy = rowY(sName, sCol), dy = rowY(dName, dCol);
 
-  // self reference (documents.ref_doc_id -> documents.id)
+  // อ้างอิงตัวเอง: documents.ref_doc_id -> documents.id
   if (sName === dName) {
-    wire([[s.x + W, sy], [s.x + W + 56, sy], [s.x + W + 56, dy], [s.x + W, dy]]);
+    wire([[s.x + W, sy], [s.x + W + 52, sy], [s.x + W + 52, dy], [s.x + W, dy]]);
     continue;
   }
 
   const dIsRight = d.x > s.x + W;
   const sIsRight = s.x > d.x + W;
-  let sx, dx, base;
 
-  if (dIsRight) {                       // center -> right column
-    sx = s.x + W; dx = d.x;
-    base = s.x + W + 36;
-    rightOffset += 7;
-    base += rightOffset % 21;
-  } else if (sIsRight) {                // right column -> center
-    sx = s.x; dx = d.x + W;
-    base = d.x + W + 36;
-    rightOffset += 7;
-    base += rightOffset % 21;
-  } else if (s.x === d.x) {             // same column (users/history หรือ documents/source_files)
-    if (s.x < 200) {
-      sx = s.x + W; dx = d.x + W;
-      base = s.x + W + 18; leftOffset += 6; base += leftOffset % 18;
-    } else {
-      sx = s.x; dx = d.x;
-      base = s.x - 26; leftOffset += 6; base -= leftOffset % 18;
-    }
-  } else {                              // center -> left column
-    sx = s.x; dx = d.x + W;
-    base = d.x + W + 26;
-    leftOffset += 6;
-    base += leftOffset % 18;
+  if (s.x === d.x && s.x < 200) {
+    // คอลัมน์ซ้าย: วกอ้อมขอบซ้ายของ canvas
+    leftOffset += 5;
+    const base = s.x - 14 - (leftOffset % 10);
+    wire([[s.x, sy], [base, sy], [base, dy], [d.x, dy]]);
+  } else if (s.x === d.x) {
+    // คอลัมน์กลาง: วกอ้อมด้านขวา
+    rightOffset += 6;
+    const base = s.x + W + 26 + (rightOffset % 12);
+    wire([[s.x + W, sy], [base, sy], [base, dy], [s.x + W, dy]]);
+  } else if (dIsRight) {
+    midOffset += 6;
+    const base = s.x + W + 30 + (midOffset % 20);
+    wire([[s.x + W, sy], [base, sy], [base, dy], [d.x, dy]]);
+  } else {
+    midOffset += 6;
+    const base = d.x + W + 22 + (midOffset % 20);
+    wire([[s.x, sy], [base, sy], [base, dy], [d.x + W, dy]]);
   }
-  wire([[sx, sy], [base, sy], [base, dy], [dx, dy]]);
 }
 </script>
 </body>
