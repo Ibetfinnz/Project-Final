@@ -11,6 +11,7 @@ import slipRoutes from './routes/slips.js';
 import uploadRoutes from './routes/upload.js';
 import dashboardRoutes from './routes/dashboard.js';
 import apRoutes from './routes/ap.js';
+import execRoutes from './routes/exec.js';
 import notificationRoutes from './routes/notifications.js';
 import internalRoutes from './routes/internal.js';
 
@@ -35,6 +36,7 @@ app.use('/api/payment-slips', requireAuth, slipRoutes);
 app.use('/api/upload', requireAuth, uploadRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/ap', requireAuth, requireRole('AP', 'EXEC'), apRoutes);
+app.use('/api/exec', requireAuth, requireRole('EXEC'), execRoutes);
 app.use('/api/notifications', requireAuth, notificationRoutes);
 
 app.use((err, _req, res, _next) => {

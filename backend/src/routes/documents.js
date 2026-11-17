@@ -66,13 +66,15 @@ r.get('/linkable', async (req, res) => {
 // เอกสารที่ชำระแล้ว: รวมเอกสารที่เชื่อมโยงกันเป็นชุดเดียว (ใช้กับหน้า "เอกสารที่ชำระแล้ว")
 // ต้องอยู่ก่อน '/:id'
 r.get('/paid-groups', async (req, res) => {
-  const side = sideOf(req.user) || (req.query.side === 'AP' ? 'AP' : 'AR');
-  const { rows: docs } = await q(
-    `SELECT d.id, d.doc_no, d.doc_type, d.status, d.issue_date, d.due_date,
-            d.subtotal, d.total, d.customer_id, c.name AS customer_name
-     FROM documents d LEFT JOIN customers c ON c.id = d.customer_id
-     WHERE d.side = $1
-     ORDER BY d.issue_date DESC, d.id DESC`, [side]);
+  // EXEC เห็นทั้งสองฝั่ง (ไม่ระบุ side) ส่วน AR/AP ถูกจำกัดด้วย sideOf()
+  const side = sideOf(req.user) || (req.query.side === 'AP' ? 'AP' : req.query.side === 'AR' ? 'AR' : null);
+  const docsSql = `
+    SELECT d.id, d.doc_no, d.doc_type, d.side, d.status, d.issue_date, d.due_date,
+           d.subtotal, d.total, d.customer_id, c.name AS customer_name
+    FROM documents d LEFT JOIN customers c ON c.id = d.customer_id
+    ${side ? 'WHERE d.side = $1' : ''}
+    ORDER BY d.issue_date DESC, d.id DESC`;
+  const { rows: docs } = await q(docsSql, side ? [side] : []);
   const { rows: edges } = await q(
     `SELECT document_id AS a, ref_document_id AS b FROM document_refs
      UNION
@@ -123,7 +125,7 @@ r.get('/paid-groups', async (req, res) => {
     groups.push({
       id: 'g' + anchor.id,
       anchor: {
-        id: anchor.id, doc_no: anchor.doc_no, doc_type: anchor.doc_type,
+        id: anchor.id, doc_no: anchor.doc_no, doc_type: anchor.doc_type, side: anchor.side,
         status: anchor.status, issue_date: anchor.issue_date, due_date: anchor.due_date,
         total: Number(anchor.total), customer_id: anchor.customer_id, customer_name: anchor.customer_name,
       },

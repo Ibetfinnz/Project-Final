@@ -20,11 +20,18 @@ const ISearch = () => <Svg size={16}><circle cx="11" cy="11" r="7" /><path d="M2
 /* ---------- หน้ารายการ ---------- */
 export default function DocumentList({ user }) {
   const isAP = user?.role === 'AP';
+  const isExec = user?.role === 'EXEC';
   const [params] = useSearchParams();
   const nav = useNavigate();
   const [rows, setRows] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [filter, setFilter] = useState({ status: params.get('status') || '', type: '', customer: '', q: params.get('q') || '' });
+  const [filter, setFilter] = useState({
+    status: params.get('status') || '',
+    type: '',
+    customer: '',
+    q: params.get('q') || '',
+    side: isExec ? (params.get('side') || '') : '',
+  });
   const [range, setRange] = useState({ from: '', to: '' });
   const [showCal, setShowCal] = useState(false);
   const [editDoc, setEditDoc] = useState(null);
@@ -63,13 +70,20 @@ export default function DocumentList({ user }) {
   return (
     <>
       <PageHeader
-        title={isAP ? 'รายการเอกสารรายจ่าย' : 'รายการเอกสารรายรับ'}
-        sub={isAP ? 'List of expense documents' : 'List of income documents'}>
-        <button className="btn green" onClick={() => nav('/create')}>+ สร้างเอกสาร</button>
+        title={isAP ? 'รายการเอกสารรายจ่าย' : isExec ? 'รายการเอกสารทั้งหมด' : 'รายการเอกสารรายรับ'}
+        sub={isAP ? 'List of expense documents' : isExec ? 'All documents · AR / AP (read-only)' : 'List of income documents'}>
+        {!isExec && <button className="btn green" onClick={() => nav('/create')}>+ สร้างเอกสาร</button>}
       </PageHeader>
       {error && <div className="err">{error}</div>}
       <Card>
         <div className="filters">
+          {isExec && (
+            <select value={filter.side} onChange={(e) => setFilter({ ...filter, side: e.target.value })}>
+              <option value="">--ทั้งสองฝั่ง--</option>
+              <option value="AR">รายรับ (AR)</option>
+              <option value="AP">รายจ่าย (AP)</option>
+            </select>
+          )}
           <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}>
             <option value="">--เลือกสถานะ--</option>
             {statusOptions.map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
@@ -98,14 +112,15 @@ export default function DocumentList({ user }) {
         )}
 
         <div className="t-wrap"><table className="t">
-          <thead><tr><th>เลขที่เอกสาร</th><th>{isAP ? 'คู่ค้า' : 'ลูกค้า'}</th><th>วันที่ออก</th><th>ครบกำหนด</th><th className="r">ยอดเงิน (บาท)</th><th>สถานะ</th><th className="r">จัดการ</th></tr></thead>
+          <thead><tr><th>เลขที่เอกสาร</th>{isExec && <th>ฝั่ง</th>}<th>{isAP || isExec ? 'คู่ค้า' : 'ลูกค้า'}</th><th>วันที่ออก</th><th>ครบกำหนด</th><th className="r">ยอดเงิน (บาท)</th><th>สถานะ</th><th className="r">จัดการ</th></tr></thead>
           <tbody>
-            {shown.length === 0 && <tr><td colSpan="7" className="empty">ไม่พบเอกสาร ลองเปลี่ยนตัวกรอง หรือสร้างเอกสารใหม่</td></tr>}
+            {shown.length === 0 && <tr><td colSpan={isExec ? 8 : 7} className="empty">ไม่พบเอกสาร ลองเปลี่ยนตัวกรอง หรือสร้างเอกสารใหม่</td></tr>}
             {shown.map((d) => {
               const p = perm(d);
               return (
                 <tr key={d.id} className="clickable" onClick={() => setView(d)}>
                   <td>{d.doc_no}<small>{DOC_TYPES[d.doc_type].sub}</small></td>
+                  {isExec && <td><span className={'exec-side-badge ' + String(d.side).toLowerCase()}>{d.side}</span></td>}
                   <td>{d.customer_name}</td><td>{dateTh(d.issue_date)}</td><td>{dateTh(d.due_date)}</td>
                   <td className="r">{baht(d.total).replace('฿', '')}</td>
                   <td><StatusBadge status={d.status} />{d.status_reason && <small title={d.status_reason}>{d.status_reason.slice(0, 40)}</small>}</td>
@@ -113,8 +128,8 @@ export default function DocumentList({ user }) {
                     <div className="act">
                       <button className="act-btn" title="ดูรายละเอียด" aria-label="ดูรายละเอียด" onClick={() => setView(d)}><IEye /></button>
                       <button className="act-btn" title="ดาวน์โหลด PDF" aria-label="ดาวน์โหลด PDF" onClick={() => openBlob(`/documents/${d.id}/pdf`)}><IDownload /></button>
-                      {p.edit && <button className="act-btn edit" title="แก้ไขเอกสาร" aria-label="แก้ไขเอกสาร" onClick={() => openEdit(d)}><IPencil /></button>}
-                      {p.del && <button className="act-btn del" title="ลบ" aria-label="ลบ" onClick={() => remove(d)}><ITrash /></button>}
+                      {!isExec && p.edit && <button className="act-btn edit" title="แก้ไขเอกสาร" aria-label="แก้ไขเอกสาร" onClick={() => openEdit(d)}><IPencil /></button>}
+                      {!isExec && p.del && <button className="act-btn del" title="ลบ" aria-label="ลบ" onClick={() => remove(d)}><ITrash /></button>}
                     </div>
                   </td>
                 </tr>
@@ -132,6 +147,7 @@ export default function DocumentList({ user }) {
           onEdit={(d) => openEdit(d)}
           onConfirmPay={(d) => openEdit(d)}
           isAP={isAP}
+          readOnly={isExec}
           onCreateInvoice={(d) => nav(`/create?type=INV&ref=${encodeURIComponent(d.doc_no)}`)}
           onNotifyCustomer={(d) => alert('TODO: ส่งอีเมลแจ้งลูกค้า ' + d.doc_no)}
         />

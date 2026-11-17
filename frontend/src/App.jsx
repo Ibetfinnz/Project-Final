@@ -10,6 +10,8 @@ import VerifyPayment from './pages/AR/VerifyPayment.jsx';
 import VerifyMatching from './pages/AP/VerifyMatching.jsx';
 import UploadFile from './pages/commonAR+AP/UploadFile.jsx';
 import PaidDocuments from './pages/commonAR+AP/PaidDocuments.jsx';
+import ExecDashboard from './pages/EXEC/Dashboard.jsx';
+import ExecDocumentsOverview from './pages/EXEC/DocumentsOverview.jsx';
 
 export default function App() {
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user') || 'null'));
@@ -34,7 +36,14 @@ export default function App() {
   return (
     <Layout user={user} onLogout={logout}>
       <Routes>
-        <Route path="/" element={user?.role === 'AP' ? <DashboardAP /> : <Dashboard />} />
+        <Route path="/" element={
+          user?.role === 'AP' ? <DashboardAP />
+            : user?.role === 'EXEC' ? <ExecDashboard />
+              : <Dashboard />
+        } />
+        <Route path="/exec/documents" element={
+          user?.role === 'EXEC' ? <ExecDocumentsOverview /> : <Navigate to="/" />
+        } />
         <Route path="/create" element={<CreateDocument user={user} />} />
         <Route path="/documents" element={<DocumentList user={user} />} />
         <Route path="/paid" element={<PaidDocuments user={user} />} />

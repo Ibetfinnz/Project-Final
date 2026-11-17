@@ -24,6 +24,7 @@ const inRange = (day, range) =>
 
 export default function PaidDocuments({ user }) {
   const isAP = user?.role === 'AP';
+  const isExec = user?.role === 'EXEC';
   const [groups, setGroups] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [filter, setFilter] = useState({ type: '', customer: '', q: '' });
@@ -73,8 +74,10 @@ export default function PaidDocuments({ user }) {
   return (
     <>
       <PageHeader
-        title={isAP ? 'เอกสารรายจ่ายที่ชำระแล้ว' : 'เอกสารที่ชำระแล้ว'}
-        sub="Paid documents — grouped by connected document chain" />
+        title={isAP ? 'เอกสารรายจ่ายที่ชำระแล้ว' : isExec ? 'เอกสารที่ชำระแล้วทั้งหมด' : 'เอกสารที่ชำระแล้ว'}
+        sub={isExec
+          ? 'Paid documents · ทั้งสองฝั่ง จัดกลุ่มตามสายเอกสาร'
+          : 'Paid documents — grouped by connected document chain'} />
       {error && <div className="err">{error}</div>}
 
       <Card>
@@ -115,7 +118,8 @@ export default function PaidDocuments({ user }) {
             <tr>
               <th style={{ width: 34 }} />
               <th>เลขที่เอกสาร</th>
-              <th>{isAP ? 'คู่ค้า' : 'ลูกค้า'}</th>
+              {isExec && <th>ฝั่ง</th>}
+              <th>{isAP || isExec ? 'คู่ค้า' : 'ลูกค้า'}</th>
               <th>วันที่ออก</th>
               <th>ครบกำหนด</th>
               <th className="r">ยอดเงิน (บาท)</th>
@@ -126,7 +130,7 @@ export default function PaidDocuments({ user }) {
           </thead>
           <tbody>
             {shown.length === 0 && (
-              <tr><td colSpan="9" className="empty">ยังไม่มีเอกสารที่ชำระแล้ว</td></tr>
+              <tr><td colSpan={isExec ? 10 : 9} className="empty">ยังไม่มีเอกสารที่ชำระแล้ว</td></tr>
             )}
             {shown.map((g) => {
               const isOpen = !!open[g.id];
@@ -138,6 +142,7 @@ export default function PaidDocuments({ user }) {
                       {g.anchor.doc_no}
                       <small>{DOC_TYPES[g.anchor.doc_type]?.sub || g.anchor.doc_type}</small>
                     </td>
+                    {isExec && <td><span className={'exec-side-badge ' + String(g.anchor.side || 'ar').toLowerCase()}>{g.anchor.side || '-'}</span></td>}
                     <td>{g.anchor.customer_name || '-'}</td>
                     <td>{dateTh(g.anchor.issue_date)}</td>
                     <td>{dateTh(g.anchor.due_date)}</td>
@@ -149,7 +154,7 @@ export default function PaidDocuments({ user }) {
 
                   {isOpen && (
                     <tr>
-                      <td colSpan="9" style={{ background: '#fafafa', padding: '4px 12px 10px 44px' }}>
+                      <td colSpan={isExec ? 10 : 9} style={{ background: '#fafafa', padding: '4px 12px 10px 44px' }}>
                         <div style={{ fontSize: 12, color: '#6b7280', padding: '6px 0' }}>
                           เอกสารที่เชื่อมต่อกันในชุดนี้
                         </div>

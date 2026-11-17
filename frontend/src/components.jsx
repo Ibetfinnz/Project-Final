@@ -88,8 +88,15 @@ const NAV_AP = [
   { to: '/upload', label: 'อัปโหลดเอกสาร', icon: <path d="M12 16V4M7 9l5-5 5 5M5 20h14" /> },
 ];
 
+const NAV_EXEC = [
+  { to: '/', label: 'แดชบอร์ดการเงิน', icon: <path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6" /> },
+  { to: '/exec/documents', label: 'ภาพรวมเอกสารทั้งหมด', icon: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /> },
+  { to: '/documents', label: 'รายการเอกสารทั้งหมด', icon: <path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8l-5-5zM14 3v5h5M9 13h6M9 17h6" /> },
+  { to: '/paid', label: 'เอกสารที่ชำระแล้ว', icon: <path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8l-5-5zM14 3v5h5M9 15l2 2 4-4" /> },
+];
+
 export function Layout({ user, onLogout, children }) {
-  const NAV = user?.role === 'AP' ? NAV_AP : NAV_AR;
+  const NAV = user?.role === 'AP' ? NAV_AP : user?.role === 'EXEC' ? NAV_EXEC : NAV_AR;
   return (
     <div className="shell">
       <aside className="sidebar">
