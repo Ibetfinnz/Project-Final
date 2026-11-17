@@ -200,7 +200,7 @@ export async function saveSlip(c, { up = null, ocr, source_ref = null, file_path
   const matchResult = !doc ? 'no_invoice' : Math.abs(doc.total - amount) < 0.01 ? 'matched' : 'mismatch';
 
   const slip = (await c.query(
-    `INSERT INTO payment_slips(upload_id, transfer_at, amount, sender_name, ref_no, matched_document_id, match_result, file_path, ocr_raw, source_ref)
+    `INSERT INTO payments(upload_id, transfer_at, amount, sender_name, ref_no, matched_document_id, match_result, file_path, ocr_raw, source_ref)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
     [up?.id ?? null, ocr.transfer_datetime || null, amount, ocr.sender_name || null, ocr.ref_no || null,
      doc?.id ?? null, matchResult, up?.file_path ?? file_path, ocr, source_ref])).rows[0];

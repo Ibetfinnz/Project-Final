@@ -1,0 +1,131 @@
+// DBML สำหรับ dbdiagram.io — ระบบบัญชี AR/AP
+// วิธีใช้: วางไฟล์นี้ใน https://dbdiagram.io/d
+
+Table users {
+  id integer [pk]
+  name text
+  email text
+  password_hash text
+  role text
+  created_at timestamptz
+}
+
+Table customers {
+  id integer [pk]
+  name text
+  address text
+  tax_id text
+  email text
+  created_at timestamptz
+}
+
+Table documents {
+  id integer [pk]
+  doc_type text
+  doc_no text
+  ref_doc_id integer [ref: > documents.id]
+  ref_text text
+  customer_po text
+  customer_id integer [ref: > customers.id]
+  issue_date date
+  due_date date
+  subtotal numeric(14,2)
+  vat numeric(14,2)
+  total numeric(14,2)
+  status text
+  status_reason text
+  source text
+  source_ref text
+  file_path text
+  paid_at timestamptz
+  created_by integer [ref: > users.id]
+  created_at timestamptz
+  updated_at timestamptz
+  check_result text
+  check_notes jsonb
+  side text
+  approved_at timestamptz
+  approved_by integer [ref: > users.id]
+  payment_terms text
+}
+
+Table document_line_items {
+  id integer [pk]
+  document_id integer [ref: > documents.id]
+  description text
+  qty numeric(14,2)
+  unit_price numeric(14,2)
+  amount numeric(14,2)
+}
+
+Table document_refs {
+  document_id integer [pk, ref: > documents.id]
+  ref_document_id integer [pk, ref: > documents.id]
+}
+
+Table document_history {
+  id integer [pk]
+  document_id integer [ref: > documents.id]
+  action text
+  text text
+  by_user integer [ref: > users.id]
+  created_at timestamptz
+}
+
+Table source_files {
+  id integer [pk]
+  file_path text
+  original_name text
+  mime text
+  note text
+  status text
+  error text
+  slip_id integer
+  uploaded_by integer [ref: > users.id]
+  created_at timestamptz
+  doc_type text
+  ocr_data jsonb
+  check_preview jsonb
+  source_ref text
+  document_id integer [ref: > documents.id]
+}
+
+Table payments {
+  id integer [pk]
+  upload_id integer [ref: > source_files.id]
+  transfer_at timestamptz
+  amount numeric(14,2)
+  sender_name text
+  ref_no text
+  matched_document_id integer [ref: > documents.id]
+  match_result text
+  verified boolean
+  file_path text
+  ocr_raw jsonb
+  created_at timestamptz
+}
+
+Table notifications {
+  id integer [pk]
+  message text
+  link text
+  is_read boolean
+  created_at timestamptz
+}
+
+Table doc_counters {
+  doc_type text [pk]
+  year integer [pk]
+  last_no integer
+}
+
+Table ocr_logs {
+  id integer [pk]
+  source text
+  source_ref text
+  raw jsonb
+  confidence numeric
+  ok boolean
+  errors jsonb
+  created_at timestamptz
+}

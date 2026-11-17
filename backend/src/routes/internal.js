@@ -20,8 +20,8 @@ r.post('/documents/ingest', async (req, res) => {
   if (!source_ref) return res.status(400).json({ error: 'source_ref จำเป็น' });
 
   const dup = await q(
-    `SELECT 1 FROM documents WHERE source_ref = $1 UNION ALL SELECT 1 FROM payment_slips WHERE source_ref = $1
-     UNION ALL SELECT 1 FROM uploads WHERE source_ref = $1`, [source_ref]);
+    `SELECT 1 FROM documents WHERE source_ref = $1 UNION ALL SELECT 1 FROM payments WHERE source_ref = $1
+     UNION ALL SELECT 1 FROM source_files WHERE source_ref = $1`, [source_ref]);
   if (dup.rows[0]) return res.json({ duplicate: true, status: 'duplicate', needs_review: 'no' });
 
   let filePath = null;
@@ -39,7 +39,7 @@ r.post('/documents/ingest', async (req, res) => {
       // จำแนกไม่ได้ / OCR พัง / สลิปไม่มียอด -> ส่งเข้าคิว review ให้คนเลือกประเภทในหน้า Upload
       if (type === 'UNKNOWN' || ocrErrors.length || (type === 'SLIP' && !Number(ocr.amount))) {
         const up = (await c.query(
-          `INSERT INTO uploads(file_path, original_name, note, status, doc_type, ocr_data, error, source_ref)
+          `INSERT INTO source_files(file_path, original_name, note, status, doc_type, ocr_data, error, source_ref)
            VALUES ($1,$2,$3,'review',$4,$5,$6,$7) RETURNING id`,
           [filePath || '', file_name, `จาก Gmail: ${email_from || ''}`, type === 'UNKNOWN' ? null : type,
            { ...ocr, doc_type: type }, ocrErrors.join('; ') || null, source_ref])).rows[0];
@@ -68,10 +68,10 @@ r.post('/documents/ingest', async (req, res) => {
 // ---------- Workflow B: ผล OCR จากหน้าอัปโหลด (ยังไม่บันทึก รอผู้ใช้ยืนยัน) ----------
 r.post('/uploads/ocr-result', async (req, res) => {
   const { upload_id, ocr = {}, ocr_text = '', error } = req.body || {};
-  const up = (await q('SELECT * FROM uploads WHERE id = $1', [upload_id])).rows[0];
+  const up = (await q('SELECT * FROM source_files WHERE id = $1', [upload_id])).rows[0];
   if (!up) return res.status(404).json({ error: 'ไม่พบ upload' });
   if (error) {
-    await q(`UPDATE uploads SET status='error', error=$2 WHERE id=$1`, [up.id, error]);
+    await q(`UPDATE source_files SET status='error', error=$2 WHERE id=$1`, [up.id, error]);
     return res.json({ ok: false });
   }
 
@@ -82,7 +82,7 @@ r.post('/uploads/ocr-result', async (req, res) => {
     const cust = await findCustomer({ query: q }, ocr);
     preview = await checkChain({ query: q }, type, ocr, cust?.id);
   }
-  await q(`UPDATE uploads SET status='review', doc_type=$2, ocr_data=$3, check_preview=$4 WHERE id=$1`,
+  await q(`UPDATE source_files SET status='review', doc_type=$2, ocr_data=$3, check_preview=$4 WHERE id=$1`,
     [up.id, type === 'UNKNOWN' ? null : type, ocr, preview]);
   res.json({ ok: true, doc_type: type });
 });

@@ -39,7 +39,7 @@ r.get('/todos', async (_req, res) => {
   const slips = await q(`
     SELECT d.doc_no, d.total, c.name, s.created_at FROM documents d
     JOIN customers c ON c.id = d.customer_id
-    LEFT JOIN payment_slips s ON s.matched_document_id = d.id AND NOT s.verified
+    LEFT JOIN payments s ON s.matched_document_id = d.id AND NOT s.verified
     WHERE d.status = 'slip_review' AND d.side = 'AR' ORDER BY s.created_at DESC NULLS LAST`);
   const bad = await q(`
     SELECT doc_no, status_reason, updated_at FROM documents

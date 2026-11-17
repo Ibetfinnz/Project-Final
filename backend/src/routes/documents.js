@@ -203,7 +203,7 @@ r.put('/:id', async (req, res) => {
 
       // เก็บค่าเดิมไว้เทียบความเปลี่ยนแปลงเพื่อบันทึกประวัติ
       const oldItems = (await c.query(
-        'SELECT description, qty, unit_price, amount FROM document_items WHERE document_id = $1 ORDER BY id', [cur.id]
+        'SELECT description, qty, unit_price, amount FROM document_line_items WHERE document_id = $1 ORDER BY id', [cur.id]
       )).rows;
       const oldCustomer = (await c.query('SELECT name FROM customers WHERE id = $1', [cur.customer_id])).rows[0]?.name || null;
       const oldInvNos = cur.doc_type === 'BN'
@@ -233,10 +233,10 @@ r.put('/:id', async (req, res) => {
           vat = extra.precomputed.vat;
           total = extra.precomputed.total;
           refText = extra.ref_text;
-          await c.query('DELETE FROM document_items WHERE document_id = $1', [cur.id]);
+          await c.query('DELETE FROM document_line_items WHERE document_id = $1', [cur.id]);
           for (const l of extra.precomputed.lines) {
             await c.query(
-              'INSERT INTO document_items(document_id, description, qty, unit_price, amount) VALUES ($1,$2,$3,$4,$5)',
+              'INSERT INTO document_line_items(document_id, description, qty, unit_price, amount) VALUES ($1,$2,$3,$4,$5)',
               [cur.id, l.description, l.qty, l.unit_price, l.amount]
             );
           }
@@ -257,7 +257,7 @@ r.put('/:id', async (req, res) => {
           lines = b.items;
         } else if (b.vat_enabled !== undefined) {
           lines = (await c.query(
-            'SELECT description, qty, unit_price FROM document_items WHERE document_id = $1 ORDER BY id',
+            'SELECT description, qty, unit_price FROM document_line_items WHERE document_id = $1 ORDER BY id',
             [cur.id]
           )).rows;
         }
@@ -268,10 +268,10 @@ r.put('/:id', async (req, res) => {
           subtotal = t.subtotal;
           vat = t.vat;
           total = t.total;
-          await c.query('DELETE FROM document_items WHERE document_id = $1', [cur.id]);
+          await c.query('DELETE FROM document_line_items WHERE document_id = $1', [cur.id]);
           for (const l of t.lines) {
             await c.query(
-              'INSERT INTO document_items(document_id, description, qty, unit_price, amount) VALUES ($1,$2,$3,$4,$5)',
+              'INSERT INTO document_line_items(document_id, description, qty, unit_price, amount) VALUES ($1,$2,$3,$4,$5)',
               [cur.id, l.description, l.qty, l.unit_price, l.amount]
             );
           }
@@ -322,7 +322,7 @@ r.put('/:id', async (req, res) => {
 
       // ---------- บันทึกประวัติการแก้ไข (เฉพาะช่องที่เปลี่ยนจริง) ----------
       const newItems = (await c.query(
-        'SELECT description, qty, unit_price, amount FROM document_items WHERE document_id = $1 ORDER BY id', [cur.id]
+        'SELECT description, qty, unit_price, amount FROM document_line_items WHERE document_id = $1 ORDER BY id', [cur.id]
       )).rows;
       const dt = (v) => (v ? String(v).slice(0, 10) : '-');
       const money = (v) => Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

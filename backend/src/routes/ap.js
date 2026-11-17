@@ -78,7 +78,7 @@ const notesOf = (lines) => {
 
 const itemsOf = async (query, ids) =>
   ids.length
-    ? (await query('SELECT * FROM document_items WHERE document_id = ANY($1::int[]) ORDER BY id', [ids])).rows
+    ? (await query('SELECT * FROM document_line_items WHERE document_id = ANY($1::int[]) ORDER BY id', [ids])).rows
     : [];
 
 const groupItems = (rows) => {
@@ -112,7 +112,7 @@ r.get('/summary', async (_req, res) => {
     FROM documents WHERE side = 'AP' AND doc_type = 'INV'`);
 
   const ocr = (await q(
-    `SELECT COUNT(*)::int AS n FROM uploads u JOIN users us ON us.id = u.uploaded_by
+    `SELECT COUNT(*)::int AS n FROM source_files u JOIN users us ON us.id = u.uploaded_by
      WHERE u.status = 'review' AND us.role = 'AP'`)).rows[0];
   const invalid = (await q(
     `SELECT COUNT(*)::int AS n FROM documents WHERE side = 'AP' AND status = 'invalid'`)).rows[0];

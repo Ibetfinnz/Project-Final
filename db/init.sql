@@ -45,7 +45,7 @@ CREATE INDEX idx_documents_status ON documents(status);
 CREATE INDEX idx_documents_customer ON documents(customer_id);
 CREATE INDEX idx_documents_due ON documents(due_date);
 
-CREATE TABLE document_items (
+CREATE TABLE document_line_items (
   id SERIAL PRIMARY KEY,
   document_id INT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   description TEXT NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE doc_counters (
   PRIMARY KEY (doc_type, year)
 );
 
-CREATE TABLE uploads (
+CREATE TABLE source_files (
   id SERIAL PRIMARY KEY,
   file_path TEXT NOT NULL,
   original_name TEXT,
@@ -75,9 +75,9 @@ CREATE TABLE uploads (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE payment_slips (
+CREATE TABLE payments (
   id SERIAL PRIMARY KEY,
-  upload_id INT REFERENCES uploads(id),
+  upload_id INT REFERENCES source_files(id),
   transfer_at TIMESTAMPTZ,
   amount NUMERIC(14,2) NOT NULL DEFAULT 0,
   sender_name TEXT,
@@ -131,17 +131,17 @@ ALTER TABLE documents
   ADD COLUMN IF NOT EXISTS check_result TEXT,      -- matched | mismatch | no_reference
   ADD COLUMN IF NOT EXISTS check_notes  JSONB;
 
-ALTER TABLE uploads DROP CONSTRAINT IF EXISTS uploads_status_check;
-ALTER TABLE uploads ADD CONSTRAINT uploads_status_check
+ALTER TABLE source_files DROP CONSTRAINT IF EXISTS source_files_status_check;
+ALTER TABLE source_files ADD CONSTRAINT source_files_status_check
   CHECK (status IN ('processing','review','done','error'));
-ALTER TABLE uploads
+ALTER TABLE source_files
   ADD COLUMN IF NOT EXISTS doc_type      TEXT,
   ADD COLUMN IF NOT EXISTS ocr_data      JSONB,
   ADD COLUMN IF NOT EXISTS check_preview JSONB,
   ADD COLUMN IF NOT EXISTS source_ref    TEXT UNIQUE,
   ADD COLUMN IF NOT EXISTS document_id   INT REFERENCES documents(id) ON DELETE SET NULL;
 
-ALTER TABLE payment_slips ADD COLUMN IF NOT EXISTS source_ref TEXT UNIQUE;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS source_ref TEXT UNIQUE;
 
 -- ============================================================
 -- AP: พนักงานบัญชีรายจ่าย (Accounts Payable)

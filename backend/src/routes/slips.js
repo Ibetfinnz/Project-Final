@@ -14,7 +14,7 @@ r.get('/', async (req, res) => {
   const { rows } = await q(
     `SELECT s.*, d.doc_no, d.total AS expected, d.customer_id,
             COALESCE(c.name, s.sender_name) AS customer_name
-     FROM payment_slips s
+     FROM payments s
      LEFT JOIN documents d ON d.id = s.matched_document_id
      LEFT JOIN customers c ON c.id = d.customer_id
      ${w.length ? 'WHERE ' + w.join(' AND ') : ''}
@@ -24,7 +24,7 @@ r.get('/', async (req, res) => {
 
 // รูปสลิป (เปิดด้วย Authorization header หรือ ?token=)
 r.get('/:id/file', async (req, res) => {
-  const { rows } = await q('SELECT file_path FROM payment_slips WHERE id = $1', [req.params.id]);
+  const { rows } = await q('SELECT file_path FROM payments WHERE id = $1', [req.params.id]);
   if (!rows[0]) return res.status(404).end();
   res.sendFile(path.resolve(cfg.uploadDir, path.basename(rows[0].file_path)));
 });
@@ -33,7 +33,7 @@ r.get('/:id/file', async (req, res) => {
 r.post('/:id/verify', async (req, res) => {
   const { action, document_id } = req.body || {};
   await tx(async (c) => {
-    const s = (await c.query('SELECT * FROM payment_slips WHERE id = $1 FOR UPDATE', [req.params.id])).rows[0];
+    const s = (await c.query('SELECT * FROM payments WHERE id = $1 FOR UPDATE', [req.params.id])).rows[0];
     if (!s) throw Object.assign(new Error('ไม่พบสลิป'), { status: 404 });
     const docId = document_id || s.matched_document_id;
     const doc = docId ? (await c.query('SELECT * FROM documents WHERE id = $1', [docId])).rows[0] : null;
@@ -43,10 +43,10 @@ r.post('/:id/verify', async (req, res) => {
       if (Math.abs(doc.total - s.amount) > 0.01) {
         throw Object.assign(new Error(`ยอดสลิป ${s.amount} ไม่ตรงกับยอดเอกสาร ${doc.total}`), { status: 400 });
       }
-      await c.query(`UPDATE payment_slips SET verified = true, match_result = 'matched', matched_document_id = $1 WHERE id = $2`, [doc.id, s.id]);
+      await c.query(`UPDATE payments SET verified = true, match_result = 'matched', matched_document_id = $1 WHERE id = $2`, [doc.id, s.id]);
       await c.query(`UPDATE documents SET status = 'paid', paid_at = COALESCE($2::timestamptz, now()), status_reason = NULL, updated_at = now() WHERE id = $1`, [doc.id, s.transfer_at]);
     } else if (action === 'reject') {
-      await c.query(`UPDATE payment_slips SET verified = true, match_result = 'mismatch', matched_document_id = $1 WHERE id = $2`, [doc?.id ?? null, s.id]);
+      await c.query(`UPDATE payments SET verified = true, match_result = 'mismatch', matched_document_id = $1 WHERE id = $2`, [doc?.id ?? null, s.id]);
       if (doc) {
         await c.query(`UPDATE documents SET status = 'mismatch', status_reason = $2, updated_at = now() WHERE id = $1`, [doc.id, 'เจ้าหน้าที่ปฏิเสธสลิป: ยอด/ข้อมูลไม่ตรง']);
       }
@@ -59,13 +59,13 @@ r.post('/:id/verify', async (req, res) => {
 
 r.delete('/:id', async (req, res) => {
   const s = await tx(async (c) => {
-    const s = (await c.query('SELECT * FROM payment_slips WHERE id = $1 FOR UPDATE', [req.params.id])).rows[0];
+    const s = (await c.query('SELECT * FROM payments WHERE id = $1 FOR UPDATE', [req.params.id])).rows[0];
     if (!s) throw Object.assign(new Error('ไม่พบสลิป'), { status: 404 });
-    await c.query('DELETE FROM payment_slips WHERE id = $1', [s.id]);
+    await c.query('DELETE FROM payments WHERE id = $1', [s.id]);
 
     // คืนสถานะใบแจ้งหนี้ ถ้าไม่มีสลิปใบอื่นอ้างถึงอยู่
     if (s.matched_document_id) {
-      const other = await c.query('SELECT 1 FROM payment_slips WHERE matched_document_id = $1 LIMIT 1', [s.matched_document_id]);
+      const other = await c.query('SELECT 1 FROM payments WHERE matched_document_id = $1 LIMIT 1', [s.matched_document_id]);
       if (!other.rowCount) {
         const paidBySlip = s.verified && s.match_result === 'matched';
         await c.query(
@@ -74,15 +74,15 @@ r.delete('/:id', async (req, res) => {
           [s.matched_document_id, paidBySlip]);
       }
     }
-    if (s.upload_id) await c.query('DELETE FROM uploads WHERE id = $1', [s.upload_id]);
+    if (s.upload_id) await c.query('DELETE FROM source_files WHERE id = $1', [s.upload_id]);
     return s;
   });
 
   // ลบไฟล์บนดิสก์ถ้าไม่มีแถวไหนใช้แล้ว
   if (s.file_path) {
     const used = await q(
-      `SELECT 1 FROM documents WHERE file_path = $1 UNION ALL SELECT 1 FROM uploads WHERE file_path = $1
-       UNION ALL SELECT 1 FROM payment_slips WHERE file_path = $1 LIMIT 1`, [s.file_path]);
+      `SELECT 1 FROM documents WHERE file_path = $1 UNION ALL SELECT 1 FROM source_files WHERE file_path = $1
+       UNION ALL SELECT 1 FROM payments WHERE file_path = $1 LIMIT 1`, [s.file_path]);
     if (!used.rowCount) fs.rm(path.resolve(cfg.uploadDir, path.basename(s.file_path)), { force: true }, () => {});
   }
   res.status(204).end();

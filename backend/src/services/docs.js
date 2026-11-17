@@ -211,7 +211,7 @@ export async function createDocument(c, d) {
   const doc = rows[0];
   for (const l of t.lines) {
     await c.query(
-      'INSERT INTO document_items(document_id, description, qty, unit_price, amount) VALUES ($1,$2,$3,$4,$5)',
+      'INSERT INTO document_line_items(document_id, description, qty, unit_price, amount) VALUES ($1,$2,$3,$4,$5)',
       [doc.id, l.description, l.qty, l.unit_price, l.amount]
     );
   }
@@ -275,7 +275,7 @@ export async function getDocument(c, id) {
     [id]
   );
   if (!rows[0]) return null;
-  const items = await c.query('SELECT * FROM document_items WHERE document_id = $1 ORDER BY id', [id]);
+  const items = await c.query('SELECT * FROM document_line_items WHERE document_id = $1 ORDER BY id', [id]);
   // เอกสารที่ถูกอ้างอิงโดยตรง (เช่น ใบแจ้งหนี้ทั้งหมดในใบวางบิล)
   const linked = await c.query(
     `SELECT x.id, x.doc_no, x.doc_type, x.issue_date, x.due_date, x.subtotal, x.vat, x.total
@@ -309,7 +309,7 @@ export async function getDocument(c, id) {
   // ขั้น "การจ่ายเงิน" จะขึ้นเมื่อมีสลิปที่จับคู่กับเอกสารในสายนี้
   const slips = await c.query(
     `SELECT to_char(transfer_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM-DD') AS at
-     FROM payment_slips
+     FROM payments
      WHERE matched_document_id = ANY($1::int[]) AND match_result = 'matched'
      ORDER BY transfer_at`,
     [chain.map((x) => x.id)]

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>Database Schema — AR/AP System</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f6f8fb; }
+  body {
+    font-family: "Inter", "Segoe UI", "Noto Sans Thai", "Leelawadee UI", sans-serif;
+    color: #1f2937;
+    padding: 26px 30px 34px;
+  }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 20px 2px; }
+  .page-head h1 { margin: 0 0 4px; font-size: 20px; font-weight: 700; color: #0f2f4f; letter-spacing: .2px; }
+  .page-head .sub { font-size: 12px; color: #6b7c93; }
+  .legend { display: flex; align-items: center; gap: 16px; font-size: 11.5px; color: #5b6b7f; padding-bottom: 2px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 22px; height: 2px; background: #8aa6c2; border-radius: 2px; }
+  .legend b { font-weight: 600; }
+
+  #canvas { position: relative; width: 1290px; height: 1110px; }
+  #wires { position: absolute; inset: 0; width: 1290px; height: 1110px; overflow: visible; }
+
+  .tbl {
+    position: absolute; width: 330px; background: #fff;
+    border: 1px solid #d6dfea; border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, .07);
+  }
+  .tbl h3 {
+    margin: 0; height: 32px; padding: 0 10px;
+    display: flex; align-items: center; gap: 7px;
+    background: linear-gradient(180deg, #256092 0%, #1e527d 100%);
+    color: #fff; font-size: 12.5px; font-weight: 600; letter-spacing: .25px;
+    border-radius: 4px 4px 0 0;
+  }
+  .tbl h3 svg { flex: 0 0 auto; opacity: .9; }
+  .row {
+    display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 3px;
+    height: 19px; padding: 0 8px; font-size: 11.5px;
+    border-top: 1px solid #f1f4f8;
+  }
+  .row:nth-child(2) { border-top: none; }
+  .row:nth-child(even) { background: #fbfcfe; }
+  .k { justify-self: start; font-size: 8px; font-weight: 700; line-height: 1; padding: 2px 3px; border-radius: 3px; letter-spacing: .2px; }
+  .k.empty { padding: 0; }
+  .k.PK { background: #fdf0c3; color: #8a6100; }
+  .k.FK { background: #dbeafe; color: #1d4ed8; }
+  .k.PFK { background: #e5e7eb; color: #374151; }
+  .nm { color: #243b53; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nm.pk { font-weight: 600; }
+  .ty { color: #829ab1; font-size: 10px; white-space: nowrap; }
+
+  .foot { margin-top: 14px; font-size: 11px; color: #8a9aad; }
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <div>
+      <h1>Database Schema — ระบบบัญชี AR/AP</h1>
+      <div class="sub">PostgreSQL 16 · 11 ตาราง · ระบบเอกสารรายรับ–รายจ่าย / 2-Way Matching / ประวัติการแก้ไข</div>
+    </div>
+    <div class="legend">
+      <span><b class="k PK">PK</b> Primary Key</span>
+      <span><b class="k FK">FK</b> Foreign Key</span>
+      <span><b class="k PFK">PF</b> Primary + Foreign</span>
+      <span><i></i> ความสัมพันธ์</span>
+    </div>
+  </div>
+
+  <div id="canvas"></div>
+  <div class="foot">เอกสารอ้างอิง: docs/schema.dbml (นำไปเปิดใน dbdiagram.io เพื่อแก้ไข/ส่งออกใหม่ได้)</div>
+
+<script>
+const ROW_H = 19, HEAD_H = 32, W = 330;
+
+const S = {
+  users: {
+    x: 40, y: 40, cols: [
+      ['id', 'integer', 'PK'], ['name', 'text'], ['email', 'text'],
+      ['password_hash', 'text'], ['role', 'text'], ['created_at', 'timestamptz'],
+    ],
+  },
+  customers: {
+    x: 40, y: 250, cols: [
+      ['id', 'integer', 'PK'], ['name', 'text'], ['address', 'text'],
+      ['tax_id', 'text'], ['email', 'text'], ['created_at', 'timestamptz'],
+    ],
+  },
+  documents: {
+    x: 420, y: 40, cols: [
+      ['id', 'integer', 'PK'], ['doc_type', 'text'], ['doc_no', 'text'],
+      ['ref_doc_id', 'integer', 'FK'], ['ref_text', 'text'], ['customer_po', 'text'],
+      ['customer_id', 'integer', 'FK'], ['issue_date', 'date'], ['due_date', 'date'],
+      ['subtotal', 'numeric(14,2)'], ['vat', 'numeric(14,2)'], ['total', 'numeric(14,2)'],
+      ['status', 'text'], ['status_reason', 'text'], ['source', 'text'],
+      ['source_ref', 'text'], ['file_path', 'text'], ['paid_at', 'timestamptz'],
+      ['created_by', 'integer', 'FK'], ['created_at', 'timestamptz'], ['updated_at', 'timestamptz'],
+      ['check_result', 'text'], ['check_notes', 'jsonb'], ['side', 'text'],
+      ['approved_at', 'timestamptz'], ['approved_by', 'integer', 'FK'], ['payment_terms', 'text'],
+    ],
+  },
+  document_line_items: {
+    x: 40, y: 450, cols: [
+      ['id', 'integer', 'PK'], ['document_id', 'integer', 'FK'], ['description', 'text'],
+      ['qty', 'numeric(14,2)'], ['unit_price', 'numeric(14,2)'], ['amount', 'numeric(14,2)'],
+    ],
+  },
+  document_refs: {
+    x: 40, y: 620, cols: [
+      ['document_id', 'integer', 'PFK'], ['ref_document_id', 'integer', 'PFK'],
+    ],
+  },
+  document_history: {
+    x: 40, y: 760, cols: [
+      ['id', 'integer', 'PK'], ['document_id', 'integer', 'FK'], ['action', 'text'],
+      ['text', 'text'], ['by_user', 'integer', 'FK'], ['created_at', 'timestamptz'],
+    ],
+  },
+  source_files: {
+    x: 420, y: 630, cols: [
+      ['id', 'integer', 'PK'], ['file_path', 'text'], ['original_name', 'text'],
+      ['mime', 'text'], ['note', 'text'], ['status', 'text'],
+      ['error', 'text'], ['slip_id', 'integer'], ['uploaded_by', 'integer', 'FK'],
+      ['created_at', 'timestamptz'], ['doc_type', 'text'], ['ocr_data', 'jsonb'],
+      ['check_preview', 'jsonb'], ['source_ref', 'text'], ['document_id', 'integer', 'FK'],
+    ],
+  },
+  doc_counters: {
+    x: 420, y: 985, cols: [
+      ['doc_type', 'text', 'PK'], ['year', 'integer', 'PK'], ['last_no', 'integer'],
+    ],
+  },
+  payments: {
+    x: 900, y: 40, cols: [
+      ['id', 'integer', 'PK'], ['upload_id', 'integer', 'FK'], ['transfer_at', 'timestamptz'],
+      ['amount', 'numeric(14,2)'], ['sender_name', 'text'], ['ref_no', 'text'],
+      ['matched_document_id', 'integer', 'FK'], ['match_result', 'text'], ['verified', 'boolean'],
+      ['file_path', 'text'], ['ocr_raw', 'jsonb'], ['created_at', 'timestamptz'],
+    ],
+  },
+  notifications: {
+    x: 900, y: 360, cols: [
+      ['id', 'integer', 'PK'], ['message', 'text'], ['link', 'text'],
+      ['is_read', 'boolean'], ['created_at', 'timestamptz'],
+    ],
+  },
+  ocr_logs: {
+    x: 900, y: 540, cols: [
+      ['id', 'integer', 'PK'], ['source', 'text'], ['source_ref', 'text'],
+      ['raw', 'jsonb'], ['confidence', 'numeric'], ['ok', 'boolean'],
+      ['errors', 'jsonb'], ['created_at', 'timestamptz'],
+    ],
+  },
+};
+
+// [ตารางต้นทาง, คอลัมน์, ตารางปลายทาง, คอลัมน์, ชนิดเส้น]
+const RELS = [
+  ['documents', 'customer_id', 'customers', 'id'],
+  ['documents', 'created_by', 'users', 'id'],
+  ['documents', 'approved_by', 'users', 'id'],
+  ['document_line_items', 'document_id', 'documents', 'id'],
+  ['document_refs', 'document_id', 'documents', 'id'],
+  ['document_refs', 'ref_document_id', 'documents', 'id'],
+  ['document_history', 'document_id', 'documents', 'id'],
+  ['document_history', 'by_user', 'users', 'id'],
+  ['source_files', 'document_id', 'documents', 'id'],
+  ['source_files', 'uploaded_by', 'users', 'id'],
+  ['payments', 'upload_id', 'source_files', 'id'],
+  ['payments', 'matched_document_id', 'documents', 'id'],
+];
+
+const canvas = document.getElementById('canvas');
+const SVGNS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(SVGNS, 'svg');
+svg.setAttribute('id', 'wires');
+svg.setAttribute('width', 1290);
+svg.setAttribute('height', 1110);
+canvas.appendChild(svg);
+
+const tableIcon = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">' +
+  '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 6.5h13M6 6.5v7"/></svg>';
+
+for (const [name, t] of Object.entries(S)) {
+  const el = document.createElement('div');
+  el.className = 'tbl';
+  el.style.left = t.x + 'px';
+  el.style.top = t.y + 'px';
+  el.dataset.table = name;
+
+  let html = `<h3>${tableIcon}${name}</h3>`;
+  for (const [col, type, key] of t.cols) {
+    const badge = key === 'PFK'
+      ? '<span class="k PFK">PF</span>'
+      : key ? `<span class="k ${key}">${key}</span>` : '<span class="k empty"></span>';
+    html += `<div class="row">${badge}<span class="nm ${key === 'PK' || key === 'PFK' ? 'pk' : ''}">${col}</span><span class="ty">${type}</span></div>`;
+  }
+  el.innerHTML = html;
+  canvas.appendChild(el);
+}
+
+const rowY = (tbl, col) => {
+  const idx = S[tbl].cols.findIndex((c) => c[0] === col);
+  return S[tbl].y + HEAD_H + idx * ROW_H + ROW_H / 2;
+};
+
+function roundedPath(pts, r = 7) {
+  let d = `M ${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [px, py] = pts[i - 1];
+    const [cx, cy] = pts[i];
+    if (i === pts.length - 1) { d += ` L ${cx} ${cy}`; break; }
+    const [nx, ny] = pts[i + 1];
+    const dx1 = Math.sign(cx - px), dy1 = Math.sign(cy - py);
+    const dx2 = Math.sign(nx - cx), dy2 = Math.sign(ny - cy);
+    if (dx1 !== dx2 || dy1 !== dy2) {
+      const corner = [cx - dx1 * r, cy - dy1 * r];
+      const after = [cx + dx2 * r, cy + dy2 * r];
+      d += ` L ${corner[0]} ${corner[1]} Q ${cx} ${cy} ${after[0]} ${after[1]}`;
+    } else {
+      d += ` L ${cx} ${cy}`;
+    }
+  }
+  return d;
+}
+
+function wire(pts) {
+  const p = document.createElementNS(SVGNS, 'path');
+  p.setAttribute('d', roundedPath(pts));
+  p.setAttribute('fill', 'none');
+  p.setAttribute('stroke', '#8aa6c2');
+  p.setAttribute('stroke-width', '1.5');
+  p.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(p);
+  for (const [x, y] of [pts[0], pts[pts.length - 1]]) {
+    const c = document.createElementNS(SVGNS, 'circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.4);
+    c.setAttribute('fill', '#6f92b7');
+    svg.appendChild(c);
+  }
+}
+
+let leftOffset = 0;
+let rightOffset = 0;
+
+for (const [sName, sCol, dName, dCol] of RELS) {
+  const s = S[sName], d = S[dName];
+  const sy = rowY(sName, sCol), dy = rowY(dName, dCol);
+
+  // self reference (documents.ref_doc_id -> documents.id)
+  if (sName === dName) {
+    wire([[s.x + W, sy], [s.x + W + 56, sy], [s.x + W + 56, dy], [s.x + W, dy]]);
+    continue;
+  }
+
+  const dIsRight = d.x > s.x + W;
+  const sIsRight = s.x > d.x + W;
+  let sx, dx, base;
+
+  if (dIsRight) {                       // center -> right column
+    sx = s.x + W; dx = d.x;
+    base = s.x + W + 36;
+    rightOffset += 7;
+    base += rightOffset % 21;
+  } else if (sIsRight) {                // right column -> center
+    sx = s.x; dx = d.x + W;
+    base = d.x + W + 36;
+    rightOffset += 7;
+    base += rightOffset % 21;
+  } else if (s.x === d.x) {             // same column (users/history หรือ documents/source_files)
+    if (s.x < 200) {
+      sx = s.x + W; dx = d.x + W;
+      base = s.x + W + 18; leftOffset += 6; base += leftOffset % 18;
+    } else {
+      sx = s.x; dx = d.x;
+      base = s.x - 26; leftOffset += 6; base -= leftOffset % 18;
+    }
+  } else {                              // center -> left column
+    sx = s.x; dx = d.x + W;
+    base = d.x + W + 26;
+    leftOffset += 6;
+    base += leftOffset % 18;
+  }
+  wire([[sx, sy], [base, sy], [base, dy], [dx, dy]]);
+}
+</script>
+</body>
+</html>
