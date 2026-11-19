@@ -66,7 +66,7 @@ r.post('/:id/confirm', async (req, res) => {
     if (up.status !== 'review') throw Object.assign(new Error('รายการนี้บันทึกไปแล้วหรือยังอ่านไม่เสร็จ'), { status: 409 });
 
     if (doc_type === 'SLIP') {
-      const s = await saveSlip(c, { up, ocr: data });
+      const s = await saveSlip(c, { up, ocr: data, side: req.user.role === 'AP' ? 'AP' : 'AR' });
       await c.query(`UPDATE source_files SET status='done', doc_type='SLIP', slip_id=$2 WHERE id=$1`, [up.id, s.slip_id]);
       return s;
     }

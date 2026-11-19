@@ -10,9 +10,11 @@ import {
 } from './ui.jsx';
 
 const TYPE_ORDER = ['QT', 'OP', 'INV', 'BN', 'RC', 'TX'];
+const TYPE_LABEL_OVERRIDE = { RC: 'ใบเสร็จรับเงิน' };
 
 function DocTypePanel({ side, rows }) {
   const sideLabel = side === 'AR' ? 'รายรับ' : 'รายจ่าย';
+  const rcTotal = Number(rows.find((r) => r.doc_type === 'RC')?.total || 0);
   return (
     <Panel
       title={`เอกสาร${sideLabel}`}
@@ -24,10 +26,12 @@ function DocTypePanel({ side, rows }) {
           const row = rows.find((r) => r.doc_type === type) || {
             doc_type: type, total: 0, paid: 0, pending: 0, overdue: 0, cancelled: 0,
           };
+          // ใบเสร็จรับเงิน/ใบกำกับภาษี (RC) ถือเป็นใบกำกับภาษีด้วย จึงรวมจำนวนเข้ากับแถวใบกำกับภาษี
+          const total = type === 'TX' ? Number(row.total || 0) + rcTotal : Number(row.total || 0);
           return (
-            <div className={`ex-doc-row ${row.total === 0 ? 'is-zero' : ''}`} key={type}>
-              <span className="ex-doc-name">{DOC_TYPES[type]?.label || type}</span>
-              <span className="ex-doc-count">{row.total} ใบ</span>
+            <div className={`ex-doc-row ${total === 0 ? 'is-zero' : ''}`} key={type}>
+              <span className="ex-doc-name">{TYPE_LABEL_OVERRIDE[type] || DOC_TYPES[type]?.label || type}</span>
+              <span className="ex-doc-count">{total} ใบ</span>
               <span className="ex-badge green">{sideLabel}</span>
             </div>
           );

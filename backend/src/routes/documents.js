@@ -10,6 +10,8 @@ const r = Router();
 const SOURCES = { INV: ['OP'], BN: ['INV'], RC: ['INV', 'BN'] };
 // ต้นทางที่ "ถูกอ้างอิงโดยประเภทเหล่านี้แล้ว" จะไม่แสดงให้เลือกอีก
 const EXCLUDED_BY = { INV: ['INV'], BN: ['BN', 'RC'], RC: ['RC', 'BN'] };
+// ใบสั่งซื้อที่ยังรอออกใบแจ้งหนี้ได้ (AR = wait_invoice, AP = po_wait_invoice)
+const INVOICEABLE_OP = ['wait_invoice', 'po_wait_invoice'];
 
 // ฝั่งเอกสารที่ผู้ใช้เห็น: AP เห็นเฉพาะรายจ่าย, AR เห็นเฉพาะรายรับ, EXEC ดูได้ทั้งสอง
 export const sideOf = (user) =>
@@ -45,6 +47,7 @@ r.get('/linkable', async (req, res) => {
   let extra = ` AND d.side = $3`;
   p.push(sideOf(req.user) || 'AR');
   if (customer) { p.push(customer); extra += ` AND d.customer_id = $${p.length}`; }
+  if (type === 'INV') { p.push(INVOICEABLE_OP); extra += ` AND d.status::text = ANY($${p.length})`; }
   if (type === 'BN') { p.push(OUTSTANDING); extra += ` AND d.status::text = ANY($${p.length})`; }
   // ตอนแก้ไขเอกสาร: ต้องเห็นเอกสารที่ตัวเองอ้างอิงอยู่ด้วยจึงจะเลือกคงไว้ได้
   p.push(doc ? Number(doc) : null);
@@ -104,7 +107,12 @@ r.get('/paid-groups', async (req, res) => {
       const cur = queue.pop();
       comp.push(cur);
       for (const next of adj.get(cur) || []) {
-        if (!visited.has(next)) { visited.add(next); queue.push(next); }
+        const nd = byId.get(next);
+        // ไล่เฉพาะเอกสารที่ชำระแล้วด้วยกันจริง ๆ ไม่ลากเอกสารที่ยังรอชำระ/รอออกใบแจ้งหนี้เข้ามาในชุด
+        if (nd?.status === 'paid' && !visited.has(next)) {
+          visited.add(next);
+          queue.push(next);
+        }
       }
     }
 
@@ -118,7 +126,7 @@ r.get('/paid-groups', async (req, res) => {
       String(b.issue_date).localeCompare(String(a.issue_date)) || b.id - a.id);
     const anchor = paid[0];
 
-    const ordered = [...members].sort((a, b) =>
+    const ordered = [...paid].sort((a, b) =>
       (ORDER[a.doc_type] || 99) - (ORDER[b.doc_type] || 99) ||
       String(a.issue_date).localeCompare(String(b.issue_date)) || a.id - b.id);
 
@@ -130,7 +138,7 @@ r.get('/paid-groups', async (req, res) => {
         total: Number(anchor.total), customer_id: anchor.customer_id, customer_name: anchor.customer_name,
       },
       total: Number(anchor.total),
-      count: members.length,
+      count: paid.length,
       docs: ordered.map((m) => ({
         id: m.id, doc_no: m.doc_no, doc_type: m.doc_type, status: m.status,
         issue_date: m.issue_date, due_date: m.due_date, total: Number(m.total),

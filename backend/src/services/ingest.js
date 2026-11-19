@@ -179,12 +179,17 @@ export async function saveDocument(c, o) {
     [doc.id, chk.result, JSON.stringify(chk.notes)]);
   await c.query('INSERT INTO ocr_logs(source, source_ref, raw, confidence, ok, errors) VALUES ($1,$2,$3,$4,$5,$6)',
     [source, source_ref, d, confidence, ok, JSON.stringify(errors)]);
-  await notify(c, ok ? `รับ${TYPE_LABEL[type]}ใหม่ ${doc.doc_no} จาก ${cust.name}` : `${TYPE_LABEL[type]} ${doc.doc_no} ต้องตรวจสอบ: ${errors[0]}`, `/documents?q=${doc.doc_no}`);
+  await notify(
+    c,
+    ok ? `รับ${TYPE_LABEL[type]}ใหม่ ${doc.doc_no} จาก ${cust.name}` : `${TYPE_LABEL[type]} ${doc.doc_no} ต้องตรวจสอบ: ${errors[0]}`,
+    `/documents?q=${doc.doc_no}`,
+    side
+  );
   return { kind: 'document', id: doc.id, doc_no: doc.doc_no, doc_type: type, label: TYPE_LABEL[type], status: doc.status, errors, check: chk };
 }
 
 // ---------- บันทึกสลิป + จับคู่ใบแจ้งหนี้ (ต้องเรียกภายใน tx) ----------
-export async function saveSlip(c, { up = null, ocr, source_ref = null, file_path = null }) {
+export async function saveSlip(c, { up = null, ocr, source_ref = null, file_path = null, side = null }) {
   const amount = Number(ocr.amount) || 0;
   if (!amount) throw Object.assign(new Error('อ่านยอดเงินจากสลิปไม่ได้'), { status: 400 });
 
@@ -212,6 +217,7 @@ export async function saveSlip(c, { up = null, ocr, source_ref = null, file_path
   }
   await c.query('INSERT INTO ocr_logs(source, source_ref, raw, confidence, ok) VALUES ($1,$2,$3,$4,$5)',
     [up ? 'upload' : 'gmail', String(up?.id ?? source_ref), ocr, ocr.confidence ?? null, true]);
-  await notify(c, `สลิปใหม่ ${amount.toLocaleString('th-TH')} บาท รอตรวจสอบ (${matchResult})`, '/verify');
+  const slipSide = side || doc?.side || null;
+  await notify(c, `สลิปใหม่ ${amount.toLocaleString('th-TH')} บาท รอตรวจสอบ (${matchResult})`, '/verify', slipSide);
   return { kind: 'slip', slip_id: slip.id, match_result: matchResult, doc_no: doc?.doc_no ?? null };
 }

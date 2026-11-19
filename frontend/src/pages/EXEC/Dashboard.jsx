@@ -157,52 +157,57 @@ export default function ExecDashboard() {
       </Panel>
 
       <div className="ex-fin-layout">
-        <div className="ex-outstanding green ex-fin-ar">
-          <div className="ex-outstanding-label">ลูกหนี้คงค้าง (Total AR)</div>
-          <div className="ex-outstanding-value">{compactBaht(k.ar_outstanding)}</div>
-          <div className="ex-outstanding-sub">{k.ar_outstanding_count} เอกสารที่ยังไม่ปิด</div>
-        </div>
-
-        <div className="ex-outstanding red ex-fin-ap">
-          <div className="ex-outstanding-label">เจ้าหนี้คงค้าง (Total AP)</div>
-          <div className="ex-outstanding-value">{compactBaht(k.ap_outstanding)}</div>
-          <div className="ex-outstanding-sub">{k.ap_outstanding_count} เอกสารที่ยังไม่ปิด</div>
-        </div>
-
-        <Panel title="รายรับแยกตามบริษัท" sub="Revenue streams" className="ex-fin-revenue">
-          {data.revenue.length === 0
-            ? <div className="ex-empty">ยังไม่มีข้อมูลรายได้</div>
-            : <CompanyDonut data={data.revenue} centerLabel="รายได้รวม" />}
-        </Panel>
-
-        <Panel
-          title="เปรียบเทียบอายุหนี้คงค้าง"
-          sub="AR vs AP Aging Summary"
-          className="ex-fin-aging"
-          actions={(
-            <div className="ex-legends">
-              <LegendChip color="#22c55e">AR (ลูกหนี้ – ค้างชำระ)</LegendChip>
-              <LegendChip color="#ef4444">AP (เจ้าหนี้ – ค้างชำระ)</LegendChip>
+        <div className="ex-fin-left">
+          <div className="ex-fin-top">
+            <div className="ex-outstanding green">
+              <div className="ex-outstanding-label">ลูกหนี้คงค้าง (Total AR)</div>
+              <div className="ex-outstanding-value">{compactBaht(k.ar_outstanding)}</div>
+              <div className="ex-outstanding-sub">{k.ar_outstanding_count} เอกสารที่ยังไม่ปิด</div>
             </div>
-          )}
-        >
-          <ResponsiveContainer width="100%" height={270}>
-            <BarChart data={agingChart} layout="vertical" margin={{ top: 6, right: 24, left: 0, bottom: 0 }} barGap={4}>
-              <CartesianGrid horizontal={false} stroke="#eef2f7" />
-              <XAxis type="number" tickFormatter={compact} tick={{ fontSize: 10.5 }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="bucket" width={78} tick={{ fontSize: 10.5 }} tickLine={false} axisLine={false} />
-              <Tooltip formatter={(v) => baht(v)} />
-              <Bar dataKey="AR" name="AR (ลูกหนี้ – ค้างชำระ)" fill="#22c55e" radius={[0, 3, 3, 0]} barSize={10} isAnimationActive={false} />
-              <Bar dataKey="AP" name="AP (เจ้าหนี้ – ค้างชำระ)" fill="#ef4444" radius={[0, 3, 3, 0]} barSize={10} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Panel>
 
-        <Panel title="ค่าใช้จ่ายแยกตามบริษัท" sub="Expenses by company" className="ex-fin-expense">
-          {data.expense_by_company.length === 0
-            ? <div className="ex-empty">ยังไม่มีข้อมูลรายจ่าย</div>
-            : <CompanyDonut data={data.expense_by_company} centerLabel="รายจ่ายรวม" />}
-        </Panel>
+            <div className="ex-outstanding red">
+              <div className="ex-outstanding-label">เจ้าหนี้คงค้าง (Total AP)</div>
+              <div className="ex-outstanding-value">{compactBaht(k.ap_outstanding)}</div>
+              <div className="ex-outstanding-sub">{k.ap_outstanding_count} เอกสารที่ยังไม่ปิด</div>
+            </div>
+          </div>
+
+          <Panel
+            title="เปรียบเทียบอายุหนี้คงค้าง"
+            sub="AR vs AP Aging Summary"
+            actions={(
+              <div className="ex-legends">
+                <LegendChip color="#22c55e">AR (ลูกหนี้ – ค้างชำระ)</LegendChip>
+                <LegendChip color="#ef4444">AP (เจ้าหนี้ – ค้างชำระ)</LegendChip>
+              </div>
+            )}
+          >
+            <ResponsiveContainer width="100%" height={270}>
+              <BarChart data={agingChart} layout="vertical" margin={{ top: 6, right: 24, left: 0, bottom: 0 }} barGap={4}>
+                <CartesianGrid horizontal={false} stroke="#eef2f7" />
+                <XAxis type="number" tickFormatter={compact} tick={{ fontSize: 10.5 }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="bucket" width={78} tick={{ fontSize: 10.5 }} tickLine={false} axisLine={false} />
+                <Tooltip formatter={(v) => baht(v)} />
+                <Bar dataKey="AR" name="AR (ลูกหนี้ – ค้างชำระ)" fill="#22c55e" radius={[0, 3, 3, 0]} barSize={10} isAnimationActive={false} />
+                <Bar dataKey="AP" name="AP (เจ้าหนี้ – ค้างชำระ)" fill="#ef4444" radius={[0, 3, 3, 0]} barSize={10} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Panel>
+        </div>
+
+        <div className="ex-fin-right">
+          <Panel title="รายรับแยกตามบริษัท" sub="Revenue streams">
+            {data.revenue.length === 0
+              ? <div className="ex-empty">ยังไม่มีข้อมูลรายได้</div>
+              : <CompanyDonut data={data.revenue} centerLabel="รายได้รวม" />}
+          </Panel>
+
+          <Panel title="ค่าใช้จ่ายแยกตามบริษัท" sub="Expenses by company">
+            {data.expense_by_company.length === 0
+              ? <div className="ex-empty">ยังไม่มีข้อมูลรายจ่าย</div>
+              : <CompanyDonut data={data.expense_by_company} centerLabel="รายจ่ายรวม" />}
+          </Panel>
+        </div>
       </div>
 
       <div className="ex-footnote">

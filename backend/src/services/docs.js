@@ -329,6 +329,6 @@ export async function getDocument(c, id) {
   return { ...rows[0], items: items.rows, linked: linked.rows, chain, history: history.rows };
 }
 
-export async function notify(c, message, link = null) {
-  await c.query('INSERT INTO notifications(message, link) VALUES ($1,$2)', [message, link]);
+export async function notify(c, message, link = null, side = null) {
+  await c.query('INSERT INTO notifications(message, link, side) VALUES ($1,$2,$3)', [message, link, side]);
 }

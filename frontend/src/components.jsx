@@ -56,7 +56,10 @@ function Bell() {
           {data.items.length === 0 && <p className="muted pad">ไม่มีการแจ้งเตือน</p>}
           {data.items.map((n) => (
             <button key={n.id} className={n.is_read ? '' : 'unread'} onClick={() => { setOpen(false); n.link && nav(n.link); }}>
-              {n.message}
+              <span className={'notif-side ' + (n.side === 'AP' ? 'ap' : n.side === 'AR' ? 'ar' : 'all')}>
+                {n.side || 'ทั่วไป'}
+              </span>
+              <span className="notif-text">{n.message}</span>
             </button>
           ))}
         </div>

@@ -105,9 +105,11 @@ CREATE TABLE notifications (
   id SERIAL PRIMARY KEY,
   message TEXT NOT NULL,
   link TEXT,
+  side TEXT CHECK (side IN ('AR','AP')),
   is_read BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS notifications_side_idx ON notifications(side, is_read);
 -- ตารางเชื่อมเอกสาร: ใบวางบิล 1 ใบ อ้างอิงใบแจ้งหนี้ได้หลายใบ
 -- รันกับฐานข้อมูลที่มีอยู่ 1 ครั้ง และเพิ่มชุดเดียวกันนี้ต่อท้าย db/init.sql
 -- (init.sql ทำงานเฉพาะตอนสร้างฐานข้อมูลครั้งแรก)

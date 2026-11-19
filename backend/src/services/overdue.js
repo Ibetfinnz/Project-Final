@@ -41,13 +41,12 @@ export async function syncOverdue() {
     WHERE doc_type = 'INV' AND status = 'unpaid'
       AND due_date IS NOT NULL
       AND due_date BETWEEN ${TODAY} AND ${TODAY} + ${DUE_SOON_DAYS}
-    RETURNING doc_no, due_date`);
+    RETURNING doc_no, due_date, side`);
 
   for (const d of rows) {
-    // ตาราง notifications มีคอลัมน์ message, link (ตาม notify() ใน docs.js)
     await q(
-      'INSERT INTO notifications (message, link) VALUES ($1, $2)',
-      [`ใบแจ้งหนี้ ${d.doc_no} ใกล้ครบกำหนดชำระ (ครบกำหนด ${thDate(d.due_date)})`, `/documents?q=${d.doc_no}`],
+      'INSERT INTO notifications (message, link, side) VALUES ($1, $2, $3)',
+      [`ใบแจ้งหนี้ ${d.doc_no} ใกล้ครบกำหนดชำระ (ครบกำหนด ${thDate(d.due_date)})`, `/documents?q=${d.doc_no}`, d.side],
     );
   }
 }

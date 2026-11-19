@@ -43,18 +43,18 @@ r.post('/documents/ingest', async (req, res) => {
            VALUES ($1,$2,$3,'review',$4,$5,$6,$7) RETURNING id`,
           [filePath || '', file_name, `จาก Gmail: ${email_from || ''}`, type === 'UNKNOWN' ? null : type,
            { ...ocr, doc_type: type }, ocrErrors.join('; ') || null, source_ref])).rows[0];
-        await notify(c, `เอกสารจาก Gmail จำแนกอัตโนมัติไม่ได้ รอเลือกประเภท (${file_name})`, `/upload?job=${up.id}`);
+        await notify(c, `เอกสารจาก Gmail จำแนกอัตโนมัติไม่ได้ รอเลือกประเภท (${file_name})`, `/upload?job=${up.id}`, 'AR');
         return { kind: 'review', status: 'unknown', needs_review: 'yes', label: TYPE_LABEL[type], errors: ['จำแนกประเภทหรืออ่านข้อมูลไม่ได้ ต้องให้เจ้าหน้าที่เลือกประเภทในหน้าอัปโหลด', ...ocrErrors] };
       }
 
       if (type === 'SLIP') {
-        const s = await saveSlip(c, { ocr, source_ref, file_path: filePath });
+        const s = await saveSlip(c, { ocr, source_ref, file_path: filePath, side: 'AR' });
         const matched = s.match_result === 'matched';
         return { ...s, label: TYPE_LABEL.SLIP, status: matched ? 'ok' : 'invalid', needs_review: matched ? 'no' : 'yes',
                  errors: matched ? [] : [s.match_result === 'mismatch' ? 'ยอดสลิปไม่ตรงกับใบแจ้งหนี้' : 'ไม่พบใบแจ้งหนี้ที่ตรงกับสลิป'] };
       }
 
-      const d = await saveDocument(c, { type, d: ocr, source, source_ref, file_path: filePath, email_from, confidence });
+      const d = await saveDocument(c, { type, d: ocr, source, source_ref, file_path: filePath, email_from, confidence, side: 'AR' });
       if (d.duplicate) return { ...d, status: 'duplicate', needs_review: 'no' };
       return { ...d, needs_review: d.status === 'invalid' ? 'yes' : 'no' };
     });

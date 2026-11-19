@@ -233,7 +233,7 @@ r.post('/matching/:id/approve', async (req, res) => {
       `UPDATE documents SET status = 'unpaid', status_reason = NULL,
               approved_at = now(), approved_by = $2, updated_at = now()
        WHERE id = $1 RETURNING *`, [inv.id, req.user.id]);
-    await notify(c, `อนุมัติจ่าย ${inv.doc_no} ยอด ${Number(inv.total).toLocaleString('th-TH')} บาท`, `/verify`);
+    await notify(c, `อนุมัติจ่าย ${inv.doc_no} ยอด ${Number(inv.total).toLocaleString('th-TH')} บาท`, `/verify`, 'AP');
     return rows[0];
   });
   res.json(out);
@@ -251,7 +251,7 @@ r.post('/matching/:id/request-fix', async (req, res) => {
       `UPDATE documents SET status = 'mismatch', status_reason = $2, updated_at = now()
        WHERE id = $1 RETURNING *`,
       [inv.id, reason || 'แจ้งแก้ไข: ข้อมูลไม่ตรงกับใบสั่งซื้อ']);
-    await notify(c, `แจ้งแก้ไข ${inv.doc_no}: ${reason || 'ข้อมูลไม่ตรงกับใบสั่งซื้อ'}`, `/verify`);
+    await notify(c, `แจ้งแก้ไข ${inv.doc_no}: ${reason || 'ข้อมูลไม่ตรงกับใบสั่งซื้อ'}`, `/verify`, 'AP');
     return rows[0];
   });
   res.json(out);
